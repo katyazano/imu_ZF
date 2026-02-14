@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: zf_db
+    restart: always
+    environment:
+      POSTGRES_USER: user_zf
+      POSTGRES_PASSWORD: password_zf
+      POSTGRES_DB: zf_patrimonial
+    ports:
+      - "5432:5432"
+
+  backend:
+    build: ./backend
+    container_name: zf_api
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://user_zf:password_zf@db:5432/zf_patrimonial?schema=public
+    depends_on:
+      - db
+
+  frontend:
+    build: ./frontend
+    container_name: zf_web
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend

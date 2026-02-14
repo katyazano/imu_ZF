@@ -1,0 +1,79 @@
+// Configuración de la conexión
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 1. Catálogo de Activos [cite: 36, 106]
+model Activo {
+  id_activo           Int           @id @default(autoincrement())
+  tag_administrativo  String?       @db.VarChar(50)
+  marca               String        @db.VarChar(100) // [cite: 39]
+  modelo              String        @db.VarChar(100) // [cite: 40]
+  numero_serie        String        @unique @db.VarChar(100) // [cite: 41]
+  numero_parte        String        @db.VarChar(100) // [cite: 42]
+  nombre_maquina      String        @db.VarChar(150)
+  descripcion         String?       @db.Text // [cite: 43]
+  codigo_qr           String?       @db.Text // [cite: 47]
+  estado              String        @default("Disponible") // [cite: 45]
+  ubicacion_fisica    String        @db.VarChar(150) // [cite: 46]
+  
+  // Relaciones
+  prestamos           Prestamo[]
+  mantenimientos      Mantenimiento[]
+}
+
+// 2. Usuarios y Roles [cite: 23, 106]
+model Usuario {
+  id_usuario    Int        @id @default(autoincrement())
+  nombre        String     @db.VarChar(150)
+  email         String     @unique @db.VarChar(150)
+  password_hash String
+  rol           Rol        @default(USUARIO_GENERAL) // [cite: 23]
+  id_lider      Int?       // Para el flujo de aprobación del Gerente [cite: 27, 28]
+  
+  // Relaciones
+  solicitudes   Prestamo[] @relation("Solicitante")
+  aprobaciones  Prestamo[] @relation("Aprobador")
+}
+
+enum Rol {
+  USUARIO_GENERAL      // [cite: 24]
+  GERENTE_DISCIPLINA   // [cite: 27]
+  ADMIN_PATRIMONIAL    // [cite: 30]
+  AUDITOR              // [cite: 34]
+}
+
+// 3. Flujo de Préstamos y Trazabilidad [cite: 51, 106]
+model Prestamo {
+  id_prestamo               Int       @id @default(autoincrement())
+  id_activo                 Int
+  id_solicitante            Int
+  id_aprobador              Int?
+  fecha_solicitud           DateTime  @default(now()) // [cite: 15]
+  fecha_autorizacion        DateTime? // [cite: 16]
+  fecha_salida              DateTime? // [cite: 17]
+  fecha_devolucion_prog     DateTime  // Para notificaciones de 48h/24h [cite: 53, 106]
+  fecha_devolucion_real     DateTime? // [cite: 18]
+  estado_flujo              String    @default("PENDIENTE") // [cite: 55]
+  
+  activo                    Activo    @relation(fields: [id_activo], references: [id_activo])
+  solicitante               Usuario   @relation("Solicitante", fields: [id_solicitante], references: [id_usuario])
+  aprobador                 Usuario?  @relation("Aprobador", fields: [id_aprobador], references: [id_usuario])
+}
+
+// 4. Módulo de Innovación: Mantenimiento [cite: 81, 106]
+model Mantenimiento {
+  id_mantenimiento  Int      @id @default(autoincrement())
+  id_activo         Int
+  tipo_incidencia   String   // [cite: 103]
+  descripcion       String?  @db.Text
+  fecha_reporte     DateTime @default(now())
+  estado_resolucion String   @default("ABIERTO")
+  
+  activo            Activo   @relation(fields: [id_activo], references: [id_activo])
+}
