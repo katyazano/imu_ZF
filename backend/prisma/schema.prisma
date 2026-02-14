@@ -1,79 +1,142 @@
-// Configuración de la conexión
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
 generator client {
   provider = "prisma-client-js"
 }
 
-// 1. Catálogo de Activos [cite: 36, 106]
-model Activo {
-  id_activo           Int           @id @default(autoincrement())
-  tag_administrativo  String?       @db.VarChar(50)
-  marca               String        @db.VarChar(100) // [cite: 39]
-  modelo              String        @db.VarChar(100) // [cite: 40]
-  numero_serie        String        @unique @db.VarChar(100) // [cite: 41]
-  numero_parte        String        @db.VarChar(100) // [cite: 42]
-  nombre_maquina      String        @db.VarChar(150)
-  descripcion         String?       @db.Text // [cite: 43]
-  codigo_qr           String?       @db.Text // [cite: 47]
-  estado              String        @default("Disponible") // [cite: 45]
-  ubicacion_fisica    String        @db.VarChar(150) // [cite: 46]
-  
-  // Relaciones
-  prestamos           Prestamo[]
-  mantenimientos      Mantenimiento[]
+datasource db {
+  provider = "postgresql"
 }
 
-// 2. Usuarios y Roles [cite: 23, 106]
-model Usuario {
-  id_usuario    Int        @id @default(autoincrement())
-  nombre        String     @db.VarChar(150)
-  email         String     @unique @db.VarChar(150)
-  password_hash String
-  rol           Rol        @default(USUARIO_GENERAL) // [cite: 23]
-  id_lider      Int?       // Para el flujo de aprobación del Gerente [cite: 27, 28]
-  
-  // Relaciones
-  solicitudes   Prestamo[] @relation("Solicitante")
-  aprobaciones  Prestamo[] @relation("Aprobador")
+model activos {
+  id_activo          Int                 @id @default(autoincrement())
+  numero_serie       String              @unique @db.VarChar(100)
+  nombre_maquina     String              @db.VarChar(150)
+  id_categoria       Int?
+  id_estado          Int?
+  id_ubicacion       Int?
+  id_proyecto        Int?
+  id_adquisicion     Int?
+  adquisiciones      adquisiciones?      @relation(fields: [id_adquisicion], references: [id_adquisicion], onDelete: NoAction, onUpdate: NoAction)
+  categorias_activos categorias_activos? @relation(fields: [id_categoria], references: [id_categoria], onDelete: NoAction, onUpdate: NoAction)
+  estados_activos    estados_activos?    @relation(fields: [id_estado], references: [id_estado], onDelete: NoAction, onUpdate: NoAction)
+  proyectos          proyectos?          @relation(fields: [id_proyecto], references: [id_proyecto], onDelete: NoAction, onUpdate: NoAction)
+  ubicaciones        ubicaciones?        @relation(fields: [id_ubicacion], references: [id_ubicacion], onDelete: NoAction, onUpdate: NoAction)
+  mantenimientos     mantenimientos[]
+  prestamos          prestamos[]
 }
 
-enum Rol {
-  USUARIO_GENERAL      // [cite: 24]
-  GERENTE_DISCIPLINA   // [cite: 27]
-  ADMIN_PATRIMONIAL    // [cite: 30]
-  AUDITOR              // [cite: 34]
+model adquisiciones {
+  id_adquisicion Int          @id @default(autoincrement())
+  numero_factura String       @unique @db.VarChar(100)
+  id_proveedor   Int?
+  fecha_compra   DateTime     @db.Date
+  costo          Decimal      @db.Decimal(10, 2)
+  activos        activos[]
+  proveedores    proveedores? @relation(fields: [id_proveedor], references: [id_proveedor], onDelete: NoAction, onUpdate: NoAction)
 }
 
-// 3. Flujo de Préstamos y Trazabilidad [cite: 51, 106]
-model Prestamo {
-  id_prestamo               Int       @id @default(autoincrement())
-  id_activo                 Int
-  id_solicitante            Int
-  id_aprobador              Int?
-  fecha_solicitud           DateTime  @default(now()) // [cite: 15]
-  fecha_autorizacion        DateTime? // [cite: 16]
-  fecha_salida              DateTime? // [cite: 17]
-  fecha_devolucion_prog     DateTime  // Para notificaciones de 48h/24h [cite: 53, 106]
-  fecha_devolucion_real     DateTime? // [cite: 18]
-  estado_flujo              String    @default("PENDIENTE") // [cite: 55]
-  
-  activo                    Activo    @relation(fields: [id_activo], references: [id_activo])
-  solicitante               Usuario   @relation("Solicitante", fields: [id_solicitante], references: [id_usuario])
-  aprobador                 Usuario?  @relation("Aprobador", fields: [id_aprobador], references: [id_usuario])
+model categorias_activos {
+  id_categoria Int       @id @default(autoincrement())
+  nombre       String    @unique @db.VarChar(100)
+  activos      activos[]
 }
 
-// 4. Módulo de Innovación: Mantenimiento [cite: 81, 106]
-model Mantenimiento {
-  id_mantenimiento  Int      @id @default(autoincrement())
-  id_activo         Int
-  tipo_incidencia   String   // [cite: 103]
-  descripcion       String?  @db.Text
-  fecha_reporte     DateTime @default(now())
-  estado_resolucion String   @default("ABIERTO")
-  
-  activo            Activo   @relation(fields: [id_activo], references: [id_activo])
+model disciplinas {
+  id_disciplina Int        @id @default(autoincrement())
+  nombre        String     @unique @db.VarChar(100)
+  usuarios      usuarios[]
+}
+
+model estados_activos {
+  id_estado Int       @id @default(autoincrement())
+  nombre    String    @unique @db.VarChar(50)
+  activos   activos[]
+}
+
+model estados_flujo {
+  id_estado_flujo Int         @id @default(autoincrement())
+  nombre          String      @unique @db.VarChar(50)
+  prestamos       prestamos[]
+}
+
+model estados_resolucion {
+  id_estado_resolucion Int              @id @default(autoincrement())
+  nombre               String           @unique @db.VarChar(50)
+  mantenimientos       mantenimientos[]
+}
+
+model mantenimientos {
+  id_mantenimiento     Int                 @id @default(autoincrement())
+  id_activo            Int?
+  id_reportador        Int?
+  id_estado_resolucion Int?
+  descripcion          String
+  tipo_mantenimiento   String?             @db.VarChar(50)
+  fecha_reporte        DateTime?           @default(now()) @db.Timestamp(6)
+  fecha_resolucion     DateTime?           @db.Timestamp(6)
+  activos              activos?            @relation(fields: [id_activo], references: [id_activo], onDelete: NoAction, onUpdate: NoAction)
+  estados_resolucion   estados_resolucion? @relation(fields: [id_estado_resolucion], references: [id_estado_resolucion], onDelete: NoAction, onUpdate: NoAction)
+  usuarios             usuarios?           @relation(fields: [id_reportador], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model prestamos {
+  id_prestamo                                 Int            @id @default(autoincrement())
+  id_activo                                   Int?
+  id_solicitante                              Int
+  id_lider                                    Int?
+  id_aprobador                                Int?
+  id_estado_flujo                             Int?
+  fecha_solicitud                             DateTime?      @default(now()) @db.Timestamp(6)
+  fecha_autorizacion                          DateTime?      @db.Timestamp(6)
+  fecha_devolucion_programada                 DateTime       @db.Timestamp(6)
+  fecha_salida                                DateTime?      @db.Timestamp(6)
+  fecha_devolucion_real                       DateTime?      @db.Timestamp(6)
+  activos                                     activos?       @relation(fields: [id_activo], references: [id_activo], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_prestamos_id_aprobadorTousuarios   usuarios?      @relation("prestamos_id_aprobadorTousuarios", fields: [id_aprobador], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction)
+  estados_flujo                               estados_flujo? @relation(fields: [id_estado_flujo], references: [id_estado_flujo], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_prestamos_id_liderTousuarios       usuarios?      @relation("prestamos_id_liderTousuarios", fields: [id_lider], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_prestamos_id_solicitanteTousuarios usuarios       @relation("prestamos_id_solicitanteTousuarios", fields: [id_solicitante], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model proveedores {
+  id_proveedor  Int             @id @default(autoincrement())
+  nombre        String          @db.VarChar(100)
+  contacto      String?         @db.VarChar(100)
+  adquisiciones adquisiciones[]
+}
+
+model proyectos {
+  id_proyecto Int       @id @default(autoincrement())
+  codigo      String    @unique @db.VarChar(50)
+  nombre      String    @db.VarChar(100)
+  activos     activos[]
+}
+
+model roles {
+  id_rol   Int        @id @default(autoincrement())
+  nombre   String     @unique @db.VarChar(50)
+  usuarios usuarios[]
+}
+
+model ubicaciones {
+  id_ubicacion Int       @id @default(autoincrement())
+  nombre       String    @unique @db.VarChar(100)
+  activos      activos[]
+}
+
+model usuarios {
+  id_usuario                                   Int              @id @default(autoincrement())
+  nombre_completo                              String           @db.VarChar(150)
+  email                                        String           @unique @db.VarChar(100)
+  password_hash                                String           @db.VarChar(255)
+  id_rol                                       Int?
+  id_disciplina                                Int?
+  id_lider                                     Int?
+  mantenimientos                               mantenimientos[]
+  prestamos_prestamos_id_aprobadorTousuarios   prestamos[]      @relation("prestamos_id_aprobadorTousuarios")
+  prestamos_prestamos_id_liderTousuarios       prestamos[]      @relation("prestamos_id_liderTousuarios")
+  prestamos_prestamos_id_solicitanteTousuarios prestamos[]      @relation("prestamos_id_solicitanteTousuarios")
+  disciplinas                                  disciplinas?     @relation(fields: [id_disciplina], references: [id_disciplina], onDelete: NoAction, onUpdate: NoAction)
+  usuarios                                     usuarios?        @relation("usuariosTousuarios", fields: [id_lider], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction)
+  other_usuarios                               usuarios[]       @relation("usuariosTousuarios")
+  roles                                        roles?           @relation(fields: [id_rol], references: [id_rol], onDelete: NoAction, onUpdate: NoAction)
 }

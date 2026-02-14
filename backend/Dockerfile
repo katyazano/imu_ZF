@@ -2,15 +2,20 @@ FROM node:24-alpine
 
 WORKDIR /app
 
-# Instalar dependencias
+# 1. Copiar archivos de dependencias
 COPY package*.json ./
+
+# 2. Instalar TODO (incluyendo prisma y @prisma/client)
 RUN npm install
 
-# Copiar el esquema de Prisma y generar el cliente
+# 3. Copiar configuración y esquema
 COPY prisma ./prisma/
+COPY prisma.config.ts ./ 
+
+# 4. Generar el cliente de Prisma
 RUN npx prisma generate
 
-# Copiar el resto del código
+# 5. Copiar el resto del código
 COPY . .
 
 EXPOSE 3000
