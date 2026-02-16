@@ -2,10 +2,15 @@
 export default {
   content: [
     "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
+    "./src/**/*.{js,ts,jsx,tsx}", 
   ],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        zfBlue: '#0070BC',
+        zfLightBlue: '#D1E9FF',
+      },
+    },
   },
   plugins: [],
 }
