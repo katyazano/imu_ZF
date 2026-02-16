@@ -15,8 +15,11 @@ services:
     container_name: zf_api
     ports:
       - "3000:3000"
+    env_file:
+      - ./backend/.env
     environment:
-      - DATABASE_URL=postgresql://user_zf:password_zf@db:5432/zf_patrimonial?schema=public
+      # - DATABASE_URL=postgresql://user_zf:password_zf@db:5432/zf_patrimonial?schema=public
+      - PORT=3000
     depends_on:
       - db
 

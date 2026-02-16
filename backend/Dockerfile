@@ -10,7 +10,6 @@ RUN npm install
 
 # 3. Copiar configuración y esquema
 COPY prisma ./prisma/
-COPY prisma.config.ts ./ 
 
 # 4. Generar el cliente de Prisma
 RUN npx prisma generate
