@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 // Importación de Vistas (Asegúrate de que los nombres de archivo coincidan)
 import Login from './views/Login';
 import Dashboard from './views/Dashboard';
+import Activos from './views/Activos';
 
 // Podrás ir creando estas vistas después
 const Catalogo = () => <div className="p-20"><h2>Pantalla de Catálogo (En construcción)</h2></div>;
@@ -20,7 +21,7 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
 
         {/* Rutas adicionales que definimos en el Navbar */}
-        <Route path="/catalogo" element={<Catalogo />} />
+        <Route path="/activos" element={<Activos/>} />
         <Route path="/prestamos" element={<Prestamos />} />
 
         {/* Redirección por si el usuario entra a una ruta que no existe */}

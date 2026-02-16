@@ -9,7 +9,7 @@ const Navbar = () => {
   // Definimos las rutas de tu proyecto
   const navLinks = [
     { name: 'Home', path: '/dashboard' },
-    { name: 'Activos', path: '/catalogo' },
+    { name: 'Activos', path: '/activos' },
     { name: 'Prestamos', path: '/prestamos' },
     { name: 'Cerrar sesión', path: '/' }, // Redirige al Login
   ];
