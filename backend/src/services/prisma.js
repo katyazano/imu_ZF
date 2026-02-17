@@ -14,7 +14,7 @@ const connectionString = process.env.DATABASE_URL;
 // SSL requerido para conexiones seguras a Supabase
 const pool = new Pool({ 
   connectionString,
-  ssl: { rejectUnauthorized: false } 
+  ssl: { rejectUnauthorized: false }
 });
 
 // Inicialización del adaptador y cliente de Prisma

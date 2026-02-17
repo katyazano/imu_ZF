@@ -1,25 +1,24 @@
-// backend/src/index.js
 const express = require('express');
-const cors = require('cors');
-// OJO: Ya no importamos Prisma ni Pool aquí para no duplicar lógica.
+const cors = require('cors'); 
+// Importamos las rutas
+const activosRoutes = require('./routes/activos.routes');
+const authRoutes = require('./routes/auth.routes'); // <--- IMPORTANTE
 
 const app = express();
-const port = process.env.PORT || 3000;
-
-// Importar rutas
-const activosRoutes = require('./routes/activos.routes');
+const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
 
-// Rutas
+// --- ZONA DE RUTAS ---
 app.use('/api/activos', activosRoutes);
+app.use('/api/auth', authRoutes); // <--- ESTO ES LO QUE TE FALTA O NO SE GUARDÓ
 
-// Health Check Simple
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'API ZF-Halo Online 🚀' });
+// Ruta de prueba (opcional, para ver si el server vive)
+app.get('/', (req, res) => {
+  res.send('API ZF Halo funcionando 🚀');
 });
 
-app.listen(port, () => {
-  console.log(`🚀 Servidor corriendo en puerto ${port}`);
+app.listen(PORT, () => {
+  console.log(`Servidor corriendo en el puerto ${PORT}`);
 });
