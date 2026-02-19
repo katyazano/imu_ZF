@@ -1,23 +1,13 @@
 const express = require('express');
 const cors = require('cors');
+require('dotenv').config();
 const { PrismaClient } = require('@prisma/client');
-const { PrismaPg } = require('@prisma/adapter-pg');
-const { Pool } = require('pg');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// --- CONFIGURACIÓN DEL ADAPTADOR (CRÍTICO PARA PRISMA 7) ---
-const connectionString = process.env.DATABASE_URL;
-
-// 1. Crear un Pool de conexión con PostgreSQL
-const pool = new Pool({ connectionString });
-
-// 2. Crear el adaptador de Prisma
-const adapter = new PrismaPg(pool);
-
-// 3. Inicializar Prisma usando el adaptador
-const prisma = new PrismaClient({ adapter });
+// Inicializar Prisma Client estándar (Prisma 5)
+const prisma = new PrismaClient();
 
 app.use(cors());
 app.use(express.json());
@@ -40,7 +30,7 @@ app.get('/api/db-check', async (req, res) => {
 // Endpoint de Activos (Ejemplo)
 app.get('/api/activos', async (req, res) => {
   try {
-    const activos = await prisma.activo.findMany({ take: 50 });
+    const activos = await prisma.activos.findMany({ take: 50 });
     res.json(activos);
   } catch (error) {
     res.status(500).json({ error: 'Error obteniendo activos' });
