@@ -1,11 +1,11 @@
-// src/routes/auth.routes.js
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/auth.controller');
+const { verificarToken } = require('../middlewares/auth.middleware');
 
-// Módulo 1: Autenticación y Seguridad corporativa
 router.post('/login', authController.login);
+router.post('/setup-2fa', authController.generarQR); // <-- NUEVA RUTA
 router.post('/verify-2fa', authController.verify2fa);
-router.get('/me', authController.getMe);
+router.get('/me', verificarToken, authController.getMe);
 
 module.exports = router;
