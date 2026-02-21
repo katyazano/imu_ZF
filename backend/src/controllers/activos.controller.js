@@ -1,20 +1,22 @@
 // src/controllers/activos.controller.js
-const prisma = require('../services/prisma'); // Importamos tu conexión real a Supabase
+const prisma = require('../services/prisma');
 
 const getActivos = async (req, res) => {
   try {
-    // Leemos posibles filtros en la URL (ej. ?id_categoria=2&id_estado=1)
-    const { id_categoria, id_estado } = req.query;
+    // CORRECCIÓN: Cambiamos id_estado por id_estado_maquina
+    const { id_categoria, id_estado_maquina } = req.query;
     
-    // Armamos la búsqueda dinámica
     const whereClause = {};
     if (id_categoria) whereClause.id_categoria = parseInt(id_categoria);
-    if (id_estado) whereClause.id_estado = parseInt(id_estado);
+    if (id_estado_maquina) whereClause.id_estado_maquina = parseInt(id_estado_maquina);
 
     const listaActivos = await prisma.activos.findMany({
       where: whereClause,
-      // Opcional: include trae los datos de las tablas relacionadas (JOINs automáticos)
-      // include: { categorias_activos: true, estados_activos: true } 
+      // CORRECCIÓN en include (nombres reales del schema actual)
+      include: { 
+        categoria: true, 
+        estado_maquina: true 
+      } 
     });
 
     res.status(200).json(listaActivos);
@@ -44,23 +46,22 @@ const getActivoPorId = async (req, res) => {
 
 const crearActivo = async (req, res) => {
   try {
-    // Extraemos todo lo que React nos mandó en el Body
-    const { numero_serie, nombre_maquina, id_categoria, id_ubicacion } = req.body;
+    // Nota: Según tu nuevo schema, para crear necesitas muchos más campos obligatorios 
+    // (qr_codigo, marca, modelo, id_disciplina, id_gerente_responsable, etc). 
+    // Asegúrate de mandarlos todos desde Postman/React.
+    const datosNuevos = req.body;
 
     const nuevoActivo = await prisma.activos.create({
       data: {
-        numero_serie,
-        nombre_maquina,
-        id_categoria: parseInt(id_categoria),
-        id_ubicacion: parseInt(id_ubicacion),
-        id_estado: 1 // Por defecto, al crearlo entra como 'DISPONIBLE' (1)
+        ...datosNuevos, // Toma todos los datos del body
+        id_estado_maquina: 1 // CORRECCIÓN: Usamos id_estado_maquina. (1 = Disponible)
       }
     });
 
     res.status(201).json({ status: "success", new_id_activo: nuevoActivo.id_activo });
   } catch (error) {
     console.error('Error al crear activo:', error);
-    res.status(400).json({ error: "Error al crear el registro. Verifica los datos." });
+    res.status(400).json({ error: "Error al crear el registro. Verifica los datos requeridos." });
   }
 };
 
@@ -71,7 +72,7 @@ const actualizarActivo = async (req, res) => {
 
     const activoActualizado = await prisma.activos.update({
       where: { id_activo: parseInt(id) },
-      data: datosNuevos // Prisma es lo bastante inteligente para mapear esto
+      data: datosNuevos 
     });
 
     res.status(200).json({ status: "success", activo_actualizado: true, data: activoActualizado });
@@ -85,13 +86,14 @@ const darDeBajaActivo = async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Baja lógica: En lugar de usar prisma.activos.delete(), lo actualizamos
+    // CORRECCIÓN: Usamos id_estado_maquina en lugar de id_estado
     await prisma.activos.update({
       where: { id_activo: parseInt(id) },
-      data: { id_estado: 4 } // Suponiendo que el ID 4 en tu tabla de estados es "DADO DE BAJA"
+      data: { id_estado_maquina: 4 } // Asumiendo que 4 es el ID para "Dado de baja"
     });
 
-    res.status(200).json({ status: "success", mensaje: "Activo dado de baja correctamente" });
+    // CORRECCIÓN: Ajustamos el mensaje para que sea exactamente el que tu compañero documentó
+    res.status(200).json({ status: "success", mensaje: "Activo dado de baja" });
   } catch (error) {
     console.error('Error en dar de baja:', error);
     res.status(400).json({ error: "No se pudo dar de baja el activo" });
