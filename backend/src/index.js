@@ -20,7 +20,7 @@ const solicitudesRoutes = require('./routes/solicitudes.routes');
 const aprobacionesRoutes = require('./routes/aprobaciones.routes'); // Agregada
 
 // const mantenimientosRoutes = require('./routes/mantenimientos.routes');
-// const usuariosRoutes = require('./routes/usuarios.routes');
+const usuariosRoutes = require('./routes/usuarios.routes');
 // const dashboardRoutes = require('./routes/dashboard.routes');
 
 // ==========================================
@@ -36,7 +36,7 @@ app.use('/api/solicitudes', solicitudesRoutes);     // Módulo 3
 app.use('/api/aprobaciones', aprobacionesRoutes);   // Módulo 3 (Firmas y aprobaciones)
 
 // app.use('/api/mantenimientos', mantenimientosRoutes); // Módulo 4
-// app.use('/api/usuarios', usuariosRoutes);           // Módulo 5
+app.use('/api/usuarios', usuariosRoutes);           // Módulo 5
 // app.use('/api/dashboard', dashboardRoutes);         // Módulo 7
 
 // Endpoint de prueba rápida
