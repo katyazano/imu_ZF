@@ -58,9 +58,18 @@ const dictaminarFirma = async (req, res) => {
 
     if (!firmaExistente) return res.status(404).json({ error: "Firma no encontrada" });
 
-    // 2. Seguridad: ¿El rol del usuario coincide con el rol esperado de la firma?
+    // 2. Seguridad: ¿El rol del usuario coincide con el rol esperado?
     if (firmaExistente.id_rol_esperado !== id_rol_usuario) {
       return res.status(403).json({ error: "Tu rol no tiene permiso para aplicar esta firma." });
+    }
+
+    // ==========================================
+    // NUEVO CANDADO: Evitar firmar solicitudes "muertas"
+    // ==========================================
+    if (firmaExistente.solicitud.estatus_general === 'Cancelada' || firmaExistente.solicitud.estatus_general === 'Rechazada') {
+      return res.status(400).json({ 
+        error: `Operación denegada. Esta solicitud se encuentra ${firmaExistente.solicitud.estatus_general}.` 
+      });
     }
 
     // 3. PROCESO DE DICTAMEN (Transacción)
