@@ -4,8 +4,8 @@ const cors = require('cors');
 const app = express();
 
 // Middlewares globales
-app.use(cors());
 app.use(express.json()); // Vital para leer los { body } que mande React
+app.use(cors());
 
 // ==========================================
 // IMPORTACIÓN DE RUTAS (Tus 7 Módulos)
@@ -16,6 +16,7 @@ const activosRoutes = require('./routes/activos.routes');
 const solicitudesRoutes = require('./routes/solicitudes.routes');
 // const mantenimientosRoutes = require('./routes/mantenimientos.routes');
 // const usuariosRoutes = require('./routes/usuarios.routes');
+const reglasRoutes = require('./routes/reglas.routes');
 // const dashboardRoutes = require('./routes/dashboard.routes');
 
 // ==========================================
@@ -27,6 +28,7 @@ app.use('/api/activos', activosRoutes);             // Módulo 2 (Inventario)
 app.use('/api/solicitudes', solicitudesRoutes);     // Módulo 3
 // app.use('/api/mantenimientos', mantenimientosRoutes); // Módulo 4
 // app.use('/api/usuarios', usuariosRoutes);           // Módulo 5
+app.use('/api/reglas', reglasRoutes);               // Módulo 6
 // app.use('/api/dashboard', dashboardRoutes);         // Módulo 7
 
 // Endpoint de prueba rápida
