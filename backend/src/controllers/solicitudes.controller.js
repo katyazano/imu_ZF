@@ -171,4 +171,95 @@ const getSolicitudesMaster = async (req, res) => {
   }
 };
 
-module.exports = { crearSolicitud, getSolicitudesMaster };
+
+
+const getMisSolicitudes = async (req, res) => {
+  try {
+    // Sacamos el ID del usuario directamente del token
+    const id_usuario = req.usuario_token.id;
+
+    // Buscamos SOLO las solicitudes de este usuario
+    const misSolicitudes = await prisma.solicitudes.findMany({
+      where: { id_usuario_solicitante: id_usuario },
+      orderBy: { fecha_salida_programada: 'desc' },
+      include: {
+        activo: {
+          select: { nombre_maquina: true }
+        }
+      }
+    });
+
+    // Mapeamos al formato exacto de tu documento
+    const respuestaFormateada = misSolicitudes.map(sol => ({
+      id_solicitud: sol.id_solicitud,
+      estatus_general: sol.estatus_general,
+      fecha_salida_programada: sol.fecha_salida_programada,
+      activo: {
+        nombre_maquina: sol.activo?.nombre_maquina || "N/A"
+      }
+    }));
+
+    res.status(200).json(respuestaFormateada);
+  } catch (error) {
+    console.error("Error en getMisSolicitudes:", error);
+    res.status(500).json({ error: "Error al consultar tus solicitudes" });
+  }
+};
+
+
+const getSolicitudPorId = async (req, res) => {
+  try {
+    // Convertimos el string de la URL a un número entero
+        const id = parseInt(req.params.id, 10);
+
+        // Validación rápida por si mandan algo que no es un número
+        if (isNaN(id)) {
+        return res.status(400).json({ error: "El ID de la solicitud debe ser un número válido" });
+        }
+
+    const solicitud = await prisma.solicitudes.findUnique({
+      where: { id_solicitud: id },
+      // Hacemos los JOINs con los nombres exactos de tu schema
+      include: {
+        activo: { 
+          select: { nombre_maquina: true }
+        },
+        solicitante: { 
+          select: { nombre_completo: true }
+        },
+        firmas: { 
+          select: {
+            id_firma: true,
+            id_rol_esperado: true,
+            estatus_firma: true
+          }
+        }
+      }
+    });
+
+    if (!solicitud) {
+      return res.status(404).json({ error: "Solicitud no encontrada" });
+    }
+
+    // Formateamos la respuesta para que empate 100% con tu documento
+    const respuestaFormateada = {
+      id_solicitud: solicitud.id_solicitud,
+      estatus_general: solicitud.estatus_general,
+      activo: {
+        nombre_maquina: solicitud.activo?.nombre_maquina || "Desconocido"
+      },
+      solicitante: {
+        nombre_completo: solicitud.solicitante?.nombre_completo || "Desconocido"
+      },
+      firmas: solicitud.firmas
+    };
+
+    res.status(200).json(respuestaFormateada);
+  } catch (error) {
+    console.error("Error en getSolicitudPorId:", error);
+    res.status(500).json({ error: "Error al obtener el detalle de la solicitud" });
+  }
+};
+
+
+module.exports = { crearSolicitud, getSolicitudesMaster, getMisSolicitudes, getSolicitudPorId };
