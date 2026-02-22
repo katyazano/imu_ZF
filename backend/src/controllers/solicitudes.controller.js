@@ -262,4 +262,63 @@ const getSolicitudPorId = async (req, res) => {
 };
 
 
-module.exports = { crearSolicitud, getSolicitudesMaster, getMisSolicitudes, getSolicitudPorId };
+const cancelarSolicitud = async (req, res) => {
+  try {
+    const id_solicitud = parseInt(req.params.id, 10);
+    const id_usuario_auth = req.usuario_token.id;
+    const id_rol_auth = req.usuario_token.id_rol; // Extraemos el rol del token
+
+    if (isNaN(id_solicitud)) {
+      return res.status(400).json({ error: "El ID de la solicitud debe ser un número válido" });
+    }
+
+    // 1. Buscamos la solicitud
+    const solicitud = await prisma.solicitudes.findUnique({
+      where: { id_solicitud },
+    });
+
+    if (!solicitud) {
+      return res.status(404).json({ error: "Solicitud no encontrada" });
+    }
+
+    // 2. SEGURIDAD REFORZADA: 
+    // Si NO es el dueño (id_usuario_solicitante) Y TAMPOCO es Admin (id_rol 1)
+    if (solicitud.id_usuario_solicitante !== id_usuario_auth && id_rol_auth !== 1) {
+      return res.status(403).json({ error: "No tienes permiso para cancelar esta solicitud" });
+    }
+
+    // 3. LÓGICA DE NEGOCIO: Solo cancelar si sigue Pendiente
+    // Nota: Usamos 'Pendiente' con P mayúscula para que coincida con tu crearSolicitud
+    if (solicitud.estatus_general !== 'Pendiente') {
+      return res.status(400).json({ error: "Solo se pueden cancelar solicitudes en estado Pendiente" });
+    }
+
+    // 4. TRANSACCIÓN: Actualizar solicitud y liberar activo
+    await prisma.$transaction([
+      // Marcar solicitud como cancelada
+      prisma.solicitudes.update({
+        where: { id_solicitud },
+        data: { estatus_general: 'Cancelada' }
+      }),
+      // Liberar el activo (1 = Disponible)
+      prisma.activos.update({
+        where: { id_activo: solicitud.id_activo },
+        data: { id_estado_maquina: 1 } 
+      })
+    ]);
+
+    res.json({ status: "success", estatus_general: "Cancelada" });
+
+  } catch (error) {
+    console.error("Error al cancelar:", error);
+    res.status(500).json({ error: "Error interno al procesar la cancelación" });
+  }
+};
+
+module.exports = { 
+  crearSolicitud, 
+  getSolicitudesMaster, 
+  getMisSolicitudes, 
+  getSolicitudPorId, 
+  cancelarSolicitud 
+};

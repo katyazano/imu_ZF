@@ -17,4 +17,6 @@ router.get('/:id', solicitudesController.getSolicitudPorId);
 // === RUTAS POST ===
 router.post('/', solicitudesController.crearSolicitud);
 
+router.patch('/:id/cancelar', solicitudesController.cancelarSolicitud);
+
 module.exports = router;
