@@ -172,7 +172,6 @@ const getSolicitudesMaster = async (req, res) => {
 };
 
 
-
 const getMisSolicitudes = async (req, res) => {
   try {
     // Sacamos el ID del usuario directamente del token

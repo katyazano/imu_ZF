@@ -1,4 +1,3 @@
-// src/routes/solicitudes.routes.js
 const express = require('express');
 const router = express.Router();
 const solicitudesController = require('../controllers/solicitudes.controller');
@@ -17,6 +16,7 @@ router.get('/:id', solicitudesController.getSolicitudPorId);
 // === RUTAS POST ===
 router.post('/', solicitudesController.crearSolicitud);
 
+// === RUTAS PATCH ===
 router.patch('/:id/cancelar', solicitudesController.cancelarSolicitud);
 
 module.exports = router;
