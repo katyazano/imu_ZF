@@ -1,5 +1,6 @@
 // src/controllers/activos.controller.js
 const prisma = require('../services/prisma');
+const crypto = require('crypto'); // <-- 1. Importas la librería nativa de Node.js
 
 const getActivos = async (req, res) => {
   try {
@@ -46,22 +47,29 @@ const getActivoPorId = async (req, res) => {
 
 const crearActivo = async (req, res) => {
   try {
-    // Nota: Según tu nuevo schema, para crear necesitas muchos más campos obligatorios 
-    // (qr_codigo, marca, modelo, id_disciplina, id_gerente_responsable, etc). 
-    // Asegúrate de mandarlos todos desde Postman/React.
-    const datosNuevos = req.body;
+    const datosDelFrontend = req.body;
 
+    // 2. GENERACIÓN AUTOMÁTICA DEL QR (Crea un UUID único mundial)
+    const qrGenerado = crypto.randomUUID(); 
+
+    // 3. Guardamos en la base de datos
     const nuevoActivo = await prisma.activos.create({
       data: {
-        ...datosNuevos, // Toma todos los datos del body
-        id_estado_maquina: 1 // CORRECCIÓN: Usamos id_estado_maquina. (1 = Disponible)
+        ...datosDelFrontend,
+        qr_codigo: qrGenerado, // <-- Le inyectamos el UUID generado
+        id_estado_maquina: 1   // <-- 1 = "Operativa" por defecto (opcional, si no viene en el body)
       }
     });
 
-    res.status(201).json({ status: "success", new_id_activo: nuevoActivo.id_activo });
+    res.status(201).json({
+      status: "success",
+      mensaje: "Activo registrado y QR generado correctamente",
+      activo: nuevoActivo
+    });
+
   } catch (error) {
-    console.error('Error al crear activo:', error);
-    res.status(400).json({ error: "Error al crear el registro. Verifica los datos requeridos." });
+    console.error("Error al crear activo:", error);
+    res.status(500).json({ error: "Error interno al registrar el activo" });
   }
 };
 
