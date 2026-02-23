@@ -31,12 +31,18 @@ const crearSolicitud = async (req, res) => {
     }
 
     // 4. Buscamos las reglas de aprobación del Admin para esta categoría
-    const regla = await prisma.reglas_aprobacion.findUnique({
+    let regla = await prisma.reglas_aprobacion.findUnique({
       where: { id_categoria: activo.id_categoria }
     });
 
+    // 🛡️ EL PLAN B (Fallback): Si no hay regla, aplicamos la configuración por defecto
     if (!regla) {
-      return res.status(400).json({ error: "No hay reglas de firma configuradas para esta categoría." });
+      console.warn(`Categoría ${activo.id_categoria} sin reglas. Usando valores por defecto.`);
+      regla = { 
+        requiere_gerente: true, // Por seguridad, siempre pedimos firma de gerente
+        requiere_syr: false, 
+        requiere_ehs: false 
+      };
     }
 
     // 5. Construimos el "Arreglo de Firmas" basándonos en las reglas y el tipo de salida

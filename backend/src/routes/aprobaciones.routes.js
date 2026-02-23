@@ -8,6 +8,6 @@ router.use(verificarToken);
 // Bandeja de entrada para firmantes
 router.get('/pendientes', aprobacionesController.getFirmasPendientes);
 
-router.patch('/:id_firma', aprobacionesController.dictaminarFirma);
+router.patch('/dictaminar/:id_firma', aprobacionesController.dictaminarFirma);
 
 module.exports = router;

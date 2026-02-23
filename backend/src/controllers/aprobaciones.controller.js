@@ -2,13 +2,23 @@ const prisma = require('../services/prisma');
 
 const getFirmasPendientes = async (req, res) => {
   try {
-    // 1. Obtenemos el rol del jefe desde el token
-    const id_rol_jefe = req.usuario_token.id_rol;
+    const mi_id = req.usuario_token.id;
+    const mi_rol = req.usuario_token.id_rol;
 
-    // 2. Buscamos todas las firmas donde el rol coincida y el estatus sea pendiente
+    // 1. Buscamos si alguien me dejó como su suplente
+    const usuariosAQuienesSuplo = await prisma.usuarios.findMany({
+      where: { id_suplente: mi_id, activo: true },
+      select: { id_rol: true }
+    });
+
+    // 2. Armamos la lista de roles que tengo derecho a firmar
+    const roles_autorizados = [mi_rol]; 
+    usuariosAQuienesSuplo.forEach(u => roles_autorizados.push(u.id_rol));
+
+    // 3. Buscamos TODAS las firmas pendientes para esos roles
     const firmas = await prisma.aprobaciones_firma.findMany({
       where: {
-        id_rol_esperado: id_rol_jefe,
+        id_rol_esperado: { in: roles_autorizados }, // <-- MAGIA: Busca en un arreglo
         estatus_firma: 'Pendiente'
       },
       include: {
@@ -21,17 +31,13 @@ const getFirmasPendientes = async (req, res) => {
       }
     });
 
-    // 3. Mapeamos para que el JSON quede limpiecito como pide tu documento
     const respuesta = firmas.map(f => ({
       id_firma: f.id_firma,
+      rol_esperado_id: f.id_rol_esperado, // Útil para que el front sepa "con qué sombrero" firmas
       solicitud: {
         id_solicitud: f.solicitud.id_solicitud,
-        activo: {
-          nombre_maquina: f.solicitud.activo?.nombre_maquina || "N/A"
-        },
-        solicitante: {
-          nombre_completo: f.solicitud.solicitante?.nombre_completo || "Desconocido"
-        }
+        activo: { nombre_maquina: f.solicitud.activo?.nombre_maquina || "N/A" },
+        solicitante: { nombre_completo: f.solicitud.solicitante?.nombre_completo || "Desconocido" }
       }
     }));
 
@@ -42,15 +48,14 @@ const getFirmasPendientes = async (req, res) => {
   }
 };
 
-
-
 const dictaminarFirma = async (req, res) => {
   try {
     const id_firma = parseInt(req.params.id_firma);
     const { estatus_firma, comentarios } = req.body;
-    const id_rol_usuario = req.usuario_token.id_rol; // Viene de tu middleware
+    
+    const mi_id = req.usuario_token.id; // Extraemos MI ID
+    const mi_rol = req.usuario_token.id_rol;
 
-    // 1. Buscamos la firma y la solicitud asociada
     const firmaExistente = await prisma.aprobaciones_firma.findUnique({
       where: { id_firma },
       include: { solicitud: true }
@@ -58,8 +63,19 @@ const dictaminarFirma = async (req, res) => {
 
     if (!firmaExistente) return res.status(404).json({ error: "Firma no encontrada" });
 
-    // 2. Seguridad: ¿El rol del usuario coincide con el rol esperado?
-    if (firmaExistente.id_rol_esperado !== id_rol_usuario) {
+    // 2. SEGURIDAD INTELIGENTE
+    // Tengo permiso si es mi rol, O SI SOY ADMIN (id_rol === 1)
+    let tengoPermiso = (firmaExistente.id_rol_esperado === mi_rol || mi_rol === 1);
+
+    // Si no es mi rol natural, checo si soy suplente de alguien con ese rol
+    if (!tengoPermiso) {
+      const supliendoA = await prisma.usuarios.findFirst({
+        where: { id_suplente: mi_id, id_rol: firmaExistente.id_rol_esperado, activo: true }
+      });
+      if (supliendoA) tengoPermiso = true;
+    }
+
+    if (!tengoPermiso) {
       return res.status(403).json({ error: "Tu rol no tiene permiso para aplicar esta firma." });
     }
 
@@ -75,13 +91,14 @@ const dictaminarFirma = async (req, res) => {
     // 3. PROCESO DE DICTAMEN (Transacción)
     const resultado = await prisma.$transaction(async (tx) => {
       
-      // A) Actualizamos la firma actual
+      // A) Actualizamos la firma y REGISTRAMOS QUIÉN FIRMÓ 🕵️‍♀️
       const firmaActualizada = await tx.aprobaciones_firma.update({
         where: { id_firma },
         data: { 
           estatus_firma, 
           comentarios,
-          fecha_firma: new Date()
+          fecha_firma: new Date(),
+          id_usuario_firmo: mi_id // <-- CRÍTICO PARA AUDITORÍA
         }
       });
 
