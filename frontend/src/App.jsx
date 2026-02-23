@@ -5,10 +5,12 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Login from './views/Login';
 import Dashboard from './views/Dashboard';
 import Activos from './views/Activos';
-
-// Podrás ir creando estas vistas después
-const Catalogo = () => <div className="p-20"><h2>Pantalla de Catálogo (En construcción)</h2></div>;
-const Prestamos = () => <div className="p-20"><h2>Pantalla de Préstamos (En construcción)</h2></div>;
+import AdminDashboard from './views/AdminDashboard';
+import PrestamosActivos from './views/PrestamosActivos';
+import ActivoDetalle from './views/ActivoDetalle';
+import EditarActivo from './views/EditarActivo';
+import NuevoActivo from './views/NuevoActivo';
+import AdminMantenimiento from './views/AdminMantenimiento';
 
 function App() {
   return (
@@ -19,10 +21,17 @@ function App() {
 
         {/* Ruta principal: Dashboard */}
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/adminDashboard" element={<AdminDashboard />} />
 
         {/* Rutas adicionales que definimos en el Navbar */}
         <Route path="/activos" element={<Activos/>} />
-        <Route path="/prestamos" element={<Prestamos />} />
+        <Route path="/prestamos-activos" element={<PrestamosActivos />} />
+
+        {/* Rutas adicionales para activos */}
+        <Route path="/activo/:id" element={<ActivoDetalle />} />
+        <Route path="/editar-activo/:id" element={<EditarActivo />} />   
+        <Route path="/nuevo-activo" element={<NuevoActivo />} />  
+        <Route path="/admin-mantenimiento" element={<AdminMantenimiento />} />
 
         {/* Redirección por si el usuario entra a una ruta que no existe */}
         <Route path="*" element={<Navigate to="/" />} />
