@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom'; // para la navegación fluida
-import { Menu, X, Bell, User, Plus, Search, Camera } from 'lucide-react';
+import { Menu, X, Bell, User, Plus, Search, Camera, Home } from 'lucide-react';
 import zfLogo from '../assets/zf-logo.png';
 
 const Navbar = () => {
@@ -8,9 +8,9 @@ const Navbar = () => {
 
   // Definimos las rutas de tu proyecto
   const navLinks = [
-    { name: 'Home', path: '/dashboard' },
+    { name: 'Home', path: '/adminDashboard' },
     { name: 'Activos', path: '/activos' },
-    { name: 'Prestamos', path: '/prestamos' },
+    { name: 'Prestamos', path: '/prestamos-activos' },
     { name: 'Cerrar sesión', path: '/' }, // Redirige al Login
   ];
 
@@ -27,7 +27,7 @@ const Navbar = () => {
           >
             <Menu size={32} />
           </button>
-          <Link to="/dashboard">
+          <Link to="/adminDashboard">
             <img src={zfLogo} alt="ZF" className="h-8 hidden md:block brightness-0 invert" />
           </Link>
         </div>
@@ -100,20 +100,28 @@ const Navbar = () => {
       </div>
 
       {/* --- TAB BAR INFERIOR (Mobile First) --- */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 h-16 flex items-center justify-around md:hidden z-40">
-        <Link to="/notificaciones" className="text-[#0070BC]"><Bell size={28} /></Link>
+      <footer className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 h-20 flex items-center justify-around z-40">
         
+        {/* Campana de Notificaciones */}
+        <Link to="/notificaciones">
+          <Bell size={28} className="text-gray-400 hover:text-[#0070BC] transition-colors" />
+        </Link>
+
+        {/* Botón Home Central Flotante */}
         <div className="relative -top-6">
-          <Link 
-            to="/nuevo-activo"
-            className="bg-white border-2 border-gray-300 text-gray-500 rounded-full p-4 shadow-lg flex items-center justify-center active:scale-90 transition-transform"
-          >
-            <Plus size={32} strokeWidth={2.5} />
+          <Link to="/adminDashboard">
+            <div className="bg-white border-4 border-[#0070BC] rounded-full p-4 shadow-xl active:scale-95 transition-transform">
+              <Home size={32} className="text-[#0070BC]" />
+            </div>
           </Link>
         </div>
 
-        <Link to="/perfil" className="text-gray-500"><User size={28} /></Link>
-      </div>
+        {/* Perfil de Usuario */}
+        <Link to="/perfil">
+          <User size={28} className="text-gray-400 hover:text-[#0070BC] transition-colors" />
+        </Link>
+
+      </footer>
     </nav>
   );
 };
