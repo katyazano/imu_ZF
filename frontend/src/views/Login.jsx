@@ -27,7 +27,7 @@ const Login = () => {
     console.log("Código 2FA recibido en Login:", codigoIngresado);
 
     setShow2FA(false);
-    navigate('/dashboard'); // Simulación exitosa
+    navigate('/adminDashboard'); // Simulación exitosa
   };
 
   return (
