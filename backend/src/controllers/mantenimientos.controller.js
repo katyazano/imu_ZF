@@ -1,7 +1,8 @@
-// src/controllers/mantenimientos.controller.js
 const prisma = require('../services/prisma');
 
-// GET /api/mantenimientos -> Lista de equipos en el taller
+// ==========================================
+// 1. GET: Lista de equipos en el taller
+// ==========================================
 const getMantenimientos = async (req, res) => {
   try {
     const mantenimientos = await prisma.mantenimientos_incidencias.findMany({
@@ -18,34 +19,44 @@ const getMantenimientos = async (req, res) => {
   }
 };
 
-// POST /api/mantenimientos -> Levantar reporte de daño
+// ==========================================
+// 2. POST: Levantar reporte de daño (Bloquea la máquina)
+// ==========================================
 const crearMantenimiento = async (req, res) => {
   try {
     const { id_activo, id_solicitud_origen, tipo_mantenimiento, descripcion, fecha_programada } = req.body;
     const id_reportador = req.usuario_token.id; 
 
-    const nuevoMantenimiento = await prisma.mantenimientos_incidencias.create({
-      data: {
-        id_activo: parseInt(id_activo),
-        id_reportador: id_reportador,
-        id_solicitud_origen: id_solicitud_origen ? parseInt(id_solicitud_origen) : null,
-        tipo_mantenimiento,
-        descripcion,
-        fecha_programada: fecha_programada ? new Date(fecha_programada) : null,
-        estatus_reparacion: 'Abierto'
-      }
-    });
+    // 🛡️ Transacción: Creamos reporte y bloqueamos máquina al mismo tiempo (Todo o nada)
+    const nuevoMantenimiento = await prisma.$transaction(async (tx) => {
+      
+      // A) Crear el ticket de mantenimiento
+      const reporte = await tx.mantenimientos_incidencias.create({
+        data: {
+          id_activo: parseInt(id_activo),
+          id_reportador: id_reportador,
+          id_solicitud_origen: id_solicitud_origen ? parseInt(id_solicitud_origen) : null,
+          tipo_mantenimiento,
+          descripcion,
+          fecha_programada: fecha_programada ? new Date(fecha_programada) : null,
+          estatus_reparacion: 'Abierto'
+        }
+      });
 
-    // Cambiar estado de la máquina a "En mantenimiento" (ID 2)
-    await prisma.activos.update({
-      where: { id_activo: parseInt(id_activo) },
-      data: { id_estado_maquina: 2 }
+      // B) Cambiar estado de la máquina a "En mantenimiento" (ID 2)
+      await tx.activos.update({
+        where: { id_activo: parseInt(id_activo) },
+        data: { id_estado_maquina: 2 }
+      });
+
+      return reporte;
     });
 
     res.status(201).json({ 
       status: "success", 
       id_mantenimiento: nuevoMantenimiento.id_mantenimiento, 
-      estatus_reparacion: "Abierto" 
+      estatus_reparacion: "Abierto",
+      mensaje: "Reporte creado y equipo bloqueado exitosamente."
     });
   } catch (error) {
     console.error("🚨 ERROR DE PRISMA:", error);
@@ -53,26 +64,37 @@ const crearMantenimiento = async (req, res) => {
   }
 };
 
-// PATCH /api/mantenimientos/:id -> Técnico repara el equipo
+// ==========================================
+// 3. PATCH: Técnico repara el equipo (Libera la máquina)
+// ==========================================
 const cerrarMantenimiento = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const mantenimiento = await prisma.mantenimientos_incidencias.update({
-      where: { id_mantenimiento: parseInt(id) },
-      data: { 
-        estatus_reparacion: 'Cerrado', 
-        fecha_resolucion: new Date()
-      }
+    // 🛡️ Transacción: Cerramos ticket y liberamos máquina al mismo tiempo
+    await prisma.$transaction(async (tx) => {
+      
+      // A) Cerrar el ticket y registrar la fecha de resolución
+      const mantenimiento = await tx.mantenimientos_incidencias.update({
+        where: { id_mantenimiento: parseInt(id) },
+        data: { 
+          estatus_reparacion: 'Cerrado', 
+          fecha_resolucion: new Date()
+        }
+      });
+
+      // B) El equipo ya está arreglado, lo regresamos a "Operativa" (ID 1)
+      await tx.activos.update({
+        where: { id_activo: mantenimiento.id_activo },
+        data: { id_estado_maquina: 1 }
+      });
     });
 
-    // El equipo ya está arreglado, lo regresamos a "Operativa" (ID 1)
-    await prisma.activos.update({
-      where: { id_activo: mantenimiento.id_activo },
-      data: { id_estado_maquina: 1 }
+    res.status(200).json({ 
+      status: "success", 
+      activo_liberado: true, 
+      mensaje: "Equipo reparado y disponible para préstamos." 
     });
-
-    res.status(200).json({ status: "success", activo_liberado: true, mensaje: "Equipo reparado y disponible." });
   } catch (error) {
     console.error("🚨 ERROR DE PRISMA:", error);
     res.status(500).json({ error: "Error al cerrar el mantenimiento." });
