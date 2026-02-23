@@ -98,4 +98,81 @@ const darDeBajaActivo = async (req, res) => {
   }
 };
 
-module.exports = { getActivos, getActivoPorId, crearActivo, actualizarActivo, darDeBajaActivo };
+// ==========================================
+// NUEVO ENDPOINT: TRAZABILIDAD (LÍNEA DE TIEMPO)
+// ==========================================
+const getTrazabilidadActivo = async (req, res) => {
+  try {
+    const idActivo = parseInt(req.params.id);
+
+    // 1. Obtener los datos base del activo
+    const activo = await prisma.activos.findUnique({
+      where: { id_activo: idActivo }
+    });
+
+    if (!activo) {
+      return res.status(404).json({ error: "Activo no encontrado" });
+    }
+
+    // 2. Arreglo maestro donde meteremos TODOS los eventos
+    let lineaDeTiempo = [];
+
+    // A) EVENTO 1: ADQUISICIÓN (Suponiendo que tu tabla tiene fecha_creacion o similar)
+    // Si tu campo de fecha de alta se llama distinto en Prisma, solo cámbialo aquí
+    lineaDeTiempo.push({
+      tipo_evento: 'ADQUISICIÓN',
+      descripcion: 'Registro inicial en el sistema de inventario.',
+      // Si no tienes un campo de fecha de creación, usamos una fecha por defecto o la actual para que no truene
+      fecha: activo.fecha_creacion || activo.created_at || new Date('2024-01-01') 
+    });
+
+    // B) EVENTOS 2: HISTORIAL DE PRÉSTAMOS
+    const prestamos = await prisma.solicitudes.findMany({
+      where: { id_activo: idActivo },
+      include: { solicitante: { select: { nombre_completo: true } } }
+    });
+
+    prestamos.forEach(p => {
+      lineaDeTiempo.push({
+        tipo_evento: p.estatus_general === 'En curso' ? 'PRÉSTAMO ACTUAL' : 'HISTORIAL DE PRÉSTAMO',
+        descripcion: `Asignado a ${p.solicitante?.nombre_completo || 'Usuario Desconocido'} - Estatus: ${p.estatus_general}`,
+        fecha: p.fecha_creacion 
+      });
+    });
+
+    // C) EVENTOS 3: MANTENIMIENTOS 
+    // Lo envolvemos en un try/catch interno por si tu tabla de mantenimientos aún no está conectada en Prisma
+    try {
+      const mantenimientos = await prisma.mantenimientos.findMany({
+        where: { id_activo: idActivo }
+      });
+      
+      mantenimientos.forEach(m => {
+        lineaDeTiempo.push({
+          tipo_evento: 'MANTENIMIENTO',
+          descripcion: m.descripcion || m.tipo_mantenimiento || 'Revisión técnica programada',
+          fecha: m.fecha_inicio || m.fecha_creacion // Ajusta al campo de fecha de tu tabla mantenimientos
+        });
+      });
+    } catch (error) {
+      console.log('Nota: No se pudo cargar mantenimientos o la tabla no existe aún.');
+    }
+
+    // 3. ORDENAR CRONOLÓGICAMENTE (Del más reciente al más antiguo)
+    lineaDeTiempo.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+    // 4. Devolver la estructura perfecta para el frontend
+    res.status(200).json({
+      activo_id: idActivo,
+      nombre_maquina: activo.nombre_maquina,
+      numero_serie: activo.numero_serie,
+      historial_trazabilidad: lineaDeTiempo
+    });
+
+  } catch (error) {
+    console.error('Error en getTrazabilidadActivo:', error);
+    res.status(500).json({ error: "Hubo un error al generar la trazabilidad del activo" });
+  }
+};
+
+module.exports = { getActivos, getActivoPorId, crearActivo, actualizarActivo, darDeBajaActivo, getTrazabilidadActivo};

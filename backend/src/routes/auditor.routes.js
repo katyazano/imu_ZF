@@ -3,7 +3,8 @@ const {
     getDashboardKPIs, 
     getVencidos, 
     getAlertas, 
-    exportarReportes 
+    exportarReportes,
+    getHistorialWeb
 } = require('../controllers/auditor.controller');
 
 const router = Router();
@@ -18,6 +19,9 @@ router.get('/dashboard/vencidos', getVencidos);
 router.get('/alertas', getAlertas);
 
 // Endpoint para generar el Excel (Se usa POST para enviar JSON seguro) 
-router.post('/reportes/exportar', exportarReportes);
+router.get('/reportes/exportar', exportarReportes);
+
+router.get('/reportes/historial', getHistorialWeb);
+
 
 module.exports = router;
