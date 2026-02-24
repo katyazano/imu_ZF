@@ -23,11 +23,20 @@ const Login = () => {
   };
 
   const handleFinalVerify = (codigoIngresado) => {
-    // Ahora el código llega por parámetro, ya no dependemos de inputRefs aquí
     console.log("Código 2FA recibido en Login:", codigoIngresado);
-
     setShow2FA(false);
-    navigate('/adminDashboard'); // Simulación exitosa MODIFICA POR ROL
+
+    // --- NOTA PARA BACKEND: Aquí recibirán el rol desde su API de Auth ---
+    // Simulamos que el usuario es 'auditor' para probar vista 
+    const userRole = 'auditor'; 
+
+    if (userRole === 'admin') {
+      navigate('/adminDashboard');
+    } else if (userRole === 'auditor') {
+      navigate('/auditordashboard');
+    } else {
+      navigate('/dashboard'); // Usuario regular
+    }
   };
 
   return (
