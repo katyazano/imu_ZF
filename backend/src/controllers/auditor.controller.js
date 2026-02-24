@@ -1,8 +1,7 @@
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../services/prisma');
 const exceljs = require('exceljs');
 const fs = require('fs');
 const path = require('path');
-const prisma = new PrismaClient();
 
 // ==========================================
 // 1. ENDPOINT: DASHBOARD KPIs
@@ -10,13 +9,19 @@ const prisma = new PrismaClient();
 // Devuelve los totales matemáticos para las gráficas del Auditor
 const getDashboardKPIs = async (req, res) => {
   try {
+    // Validación de rol: Solo Admin, Gerente y Auditor pueden ver estos KPIs
+    const id_rol = req.usuario_token.id_rol;
+    if (![1, 3, 7].includes(id_rol)) { // Admin, Gerente, Auditor
+      return res.status(403).json({ error: "No tienes permiso para ver los KPIs." });
+    }
+
     // 1. Contar el total de activos registrados
     const total_activos = await prisma.activos.count();
 
     // 2. Contar cuántos están prestados actualmente
     const prestados_actualmente = await prisma.activos.count({
       where: {
-        estado_maquina: { nombre: 'Prestada' }
+        estado_maquina: { id_estado_maquina: '3' }
       }
     });
 
@@ -53,6 +58,12 @@ const getDashboardKPIs = async (req, res) => {
 // Escanea solicitudes vencidas que no han sido devueltas a caseta 
 const getVencidos = async (req, res) => {
   try {
+    // Validación de rol: Solo Admin, Gerente, S&R y Auditor pueden ver estos KPIs
+    const id_rol = req.usuario_token.id_rol;
+    if (![1, 3, 4, 7].includes(id_rol)) { // Admin, Gerente, S&R, Auditor
+      return res.status(403).json({ error: "No tienes permiso para ver los vencidos." });
+    }
+
     const hoy = new Date();
 
     const solicitudesVencidas = await prisma.solicitudes.findMany({
@@ -94,6 +105,12 @@ const getVencidos = async (req, res) => {
 // Muestra el historial de quiénes han recibido más correos de infracción 
 const getAlertas = async (req, res) => {
   try {
+    // Validación de rol: Solo Admin y Auditor pueden ver el registro de alertas
+    const id_rol = req.usuario_token.id_rol;
+    if (![1, 7].includes(id_rol)) { // Admin, Auditor
+      return res.status(403).json({ error: "Solo Auditores y Admins pueden ver el registro de alertas." });
+    }
+
     const alertas = await prisma.registro_alertas_retrasos.findMany({
       include: {
         infractor: { select: { nombre_completo: true } }
@@ -121,6 +138,12 @@ const getAlertas = async (req, res) => {
 // ==========================================
 const exportarReportes = async (req, res) => {
   try {
+    // Validación de rol: Solo Admin, Gerente, S&R y Auditor pueden exportar reportes
+    const id_rol = req.usuario_token.id_rol;
+    if (![1, 3, 4, 7].includes(id_rol)) { // Admin, Gerente, S&R, Auditor
+      return res.status(403).json({ error: "No tienes permiso para exportar reportes." });
+    }
+
     // 1. Ahora leemos las fechas desde la URL (query parameters) en lugar del body
     const { fecha_inicio, fecha_fin } = req.query;
 
@@ -198,6 +221,12 @@ const exportarReportes = async (req, res) => {
 // ==========================================
 const getHistorialWeb = async (req, res) => {
   try {
+    // Validación de rol: Solo Admin, Gerente, S&R y Auditor pueden ver el historial en web
+    const id_rol = req.usuario_token.id_rol;
+    if (![1, 3, 4, 7].includes(id_rol)) { 
+      return res.status(403).json({ error: "No tienes permiso para ver el historial." });
+    }
+
     // 1. Leer en qué página estamos y cuántos registros queremos (Por defecto: página 1, de 10 en 10)
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
