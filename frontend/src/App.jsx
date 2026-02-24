@@ -14,6 +14,9 @@ import AdminMantenimiento from './views/admin/AdminMantenimiento';
 import Notificaciones from './views/Notificaciones';
 import Perfil from './views/Perfil';
 import GestionarFirmas from './views/admin/GestionarFirmas';
+import AuditorDashboard from './views/auditor/AuditorDashboard';
+import Trazabilidad from './views/auditor/Trazabilidad';
+import BusquedaGlobal from './views/auditor/BusquedaGlobal';
 
 function App() {
   return (
@@ -25,6 +28,7 @@ function App() {
         {/* Ruta principal: Dashboard */}
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/adminDashboard" element={<AdminDashboard />} />
+        <Route path="/auditorDashboard" element={<AuditorDashboard />} />
 
         {/* Rutas adicionales que definimos en el Navbar */}
         <Route path="/activos" element={<Activos/>} />
@@ -40,6 +44,10 @@ function App() {
         {/* Rutas adicionales admin */}
         <Route path="/admin-mantenimiento" element={<AdminMantenimiento />} />
         <Route path="/firmas" element={<GestionarFirmas />} />
+
+        {/* Rutas adicionales auditor */}
+        <Route path="/auditor/trazabilidad/:id" element={<Trazabilidad />} />
+        <Route path="/auditor/busqueda" element={<BusquedaGlobal />} />
 
         {/* Redirección por si el usuario entra a una ruta que no existe */}
         <Route path="*" element={<Navigate to="/" />} />
