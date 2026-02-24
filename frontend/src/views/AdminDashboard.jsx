@@ -35,7 +35,7 @@ const AdminDashboard = () => {
   ];
 
   const quickActions = [
-    { title: 'Reglas de negocio', icon: <CheckCircle className="text-white" size={20} />, path: '/firmas' },
+    { title: 'Gestionar reglas de negocio', icon: <CheckCircle className="text-white" size={20} />, path: '/firmas' },
     { title: 'Administrar mantenimiento', icon: <Settings className="text-white" size={20} />, path: '/admin-mantenimiento' },
   ];
 

@@ -13,6 +13,7 @@ import NuevoActivo from './views/NuevoActivo';
 import AdminMantenimiento from './views/AdminMantenimiento';
 import Notificaciones from './views/Notificaciones';
 import Perfil from './views/Perfil';
+import GestionarFirmas from './views/GestionarFirmas';
 
 function App() {
   return (
@@ -35,7 +36,10 @@ function App() {
         <Route path="/activo/:id" element={<ActivoDetalle />} />
         <Route path="/editar-activo/:id" element={<EditarActivo />} />   
         <Route path="/nuevo-activo" element={<NuevoActivo />} />  
+        
+        {/* Rutas adicionales admin */}
         <Route path="/admin-mantenimiento" element={<AdminMantenimiento />} />
+        <Route path="/firmas" element={<GestionarFirmas />} />
 
         {/* Redirección por si el usuario entra a una ruta que no existe */}
         <Route path="*" element={<Navigate to="/" />} />
