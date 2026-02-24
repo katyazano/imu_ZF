@@ -57,7 +57,7 @@ const Navbar = () => {
             </Link>
           ))}
           <div className="flex gap-4 ml-4">
-            <Bell size={24} className="cursor-pointer" />
+            <Link to="/notificaciones"><Bell size={24} className="cursor-pointer" /></Link>
             <Link to="/perfil"><User size={24} className="cursor-pointer" /></Link>
           </div>
         </div>

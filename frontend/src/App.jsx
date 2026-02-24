@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
-// Importación de Vistas (Asegúrate de que los nombres de archivo coincidan)
+// Importación de Vistas 
 import Login from './views/Login';
 import Dashboard from './views/Dashboard';
 import Activos from './views/Activos';
@@ -11,6 +11,8 @@ import ActivoDetalle from './views/ActivoDetalle';
 import EditarActivo from './views/EditarActivo';
 import NuevoActivo from './views/NuevoActivo';
 import AdminMantenimiento from './views/AdminMantenimiento';
+import Notificaciones from './views/Notificaciones';
+import Perfil from './views/Perfil';
 
 function App() {
   return (
@@ -26,6 +28,8 @@ function App() {
         {/* Rutas adicionales que definimos en el Navbar */}
         <Route path="/activos" element={<Activos/>} />
         <Route path="/prestamos-activos" element={<PrestamosActivos />} />
+        <Route path="/notificaciones" element={<Notificaciones />} />
+        <Route path="/perfil" element={<Perfil />} />
 
         {/* Rutas adicionales para activos */}
         <Route path="/activo/:id" element={<ActivoDetalle />} />
