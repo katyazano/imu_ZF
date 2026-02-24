@@ -1,10 +1,12 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "linux-musl"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model roles {
@@ -193,17 +195,18 @@ model bitacora_caseta {
 }
 
 model mantenimientos_incidencias {
-  id_mantenimiento    Int          @id @default(autoincrement())
-  id_activo           Int
-  id_reportador       Int
-  id_solicitud_origen Int?
-  tipo_mantenimiento  String       @db.VarChar(50)
-  descripcion         String
-  estatus_reparacion  String       @db.VarChar(50)
-  fecha_reporte       DateTime?    @default(now()) @db.Timestamp(6)
-  fecha_programada    DateTime?    @db.Timestamp(6)
-  fecha_resolucion    DateTime?    @db.Timestamp(6)
-  activo              activos      @relation(fields: [id_activo], references: [id_activo], onDelete: NoAction, onUpdate: NoAction)
-  reportador          usuarios     @relation("UsuarioReportador", fields: [id_reportador], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction)
-  solicitud           solicitudes? @relation(fields: [id_solicitud_origen], references: [id_solicitud], onDelete: NoAction, onUpdate: NoAction)
+  id_mantenimiento       Int          @id @default(autoincrement())
+  id_activo              Int
+  id_reportador          Int
+  id_solicitud_origen    Int?
+  tipo_mantenimiento     String       @db.VarChar(50)
+  descripcion            String
+  estatus_reparacion     String       @db.VarChar(50)
+  fecha_reporte          DateTime?    @default(now()) @db.Timestamp(6)
+  fecha_programada       DateTime?    @db.Timestamp(6)
+  fecha_resolucion       DateTime?    @db.Timestamp(6)
+  comentarios_resolucion String?
+  activo                 activos      @relation(fields: [id_activo], references: [id_activo], onDelete: NoAction, onUpdate: NoAction)
+  reportador             usuarios     @relation("UsuarioReportador", fields: [id_reportador], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction)
+  solicitud              solicitudes? @relation(fields: [id_solicitud_origen], references: [id_solicitud], onDelete: NoAction, onUpdate: NoAction)
 }

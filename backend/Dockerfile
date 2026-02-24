@@ -1,4 +1,7 @@
-FROM node:24-alpine
+FROM node:22-alpine
+
+# Instalar OpenSSL (Requerido por Prisma en Alpine Linux)
+RUN apk add --no-cache openssl
 
 WORKDIR /app
 
@@ -10,7 +13,6 @@ RUN npm install
 
 # 3. Copiar configuración y esquema
 COPY prisma ./prisma/
-COPY prisma.config.ts ./ 
 
 # 4. Generar el cliente de Prisma
 RUN npx prisma generate
@@ -20,4 +22,4 @@ COPY . .
 
 EXPOSE 3000
 
-CMD ["npm", "run", "dev"]
+CMD ["node", "src/index.js"]
