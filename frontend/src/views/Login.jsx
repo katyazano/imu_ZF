@@ -27,7 +27,7 @@ const Login = () => {
     console.log("Código 2FA recibido en Login:", codigoIngresado);
 
     setShow2FA(false);
-    navigate('/adminDashboard'); // Simulación exitosa
+    navigate('/adminDashboard'); // Simulación exitosa MODIFICA POR ROL
   };
 
   return (
