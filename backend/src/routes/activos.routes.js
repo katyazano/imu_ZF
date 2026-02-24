@@ -6,6 +6,7 @@ const activosController = require('../controllers/activos.controller');
 // Módulo 2: Inventario de Activos
 router.get('/', activosController.getActivos);
 router.post('/', activosController.crearActivo);
+router.get('/:id/trazabilidad', activosController.getTrazabilidadActivo);
 router.get('/:id', activosController.getActivoPorId);
 router.put('/:id', activosController.actualizarActivo);
 router.delete('/:id', activosController.darDeBajaActivo);
