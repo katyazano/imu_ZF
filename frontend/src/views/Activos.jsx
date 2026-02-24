@@ -12,7 +12,7 @@ const activosMock = [
 
 const Activos = () => {
   const navigate = useNavigate();
-  const [userRole] = useState('admin'); //AQUI SE PUEDE CAMBIAR EL ROL 'user' o 'admin'
+  const [userRole] = useState('user'); //AQUI SE PUEDE CAMBIAR EL ROL 'user' o 'admin'
   const [filtroEstado, setFiltroEstado] = useState('Todos');
   const [filtroTipo, setFiltroTipo] = useState('Todos'); // Nuevo filtro técnico
   const [busqueda, setBusqueda] = useState('');

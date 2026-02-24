@@ -8,7 +8,7 @@ const ActivoDetalle = () => {
   const { id } = useParams();
 
   // 1. ESTADOS
-  const [userRole] = useState('admin'); // --- NOTA BACKEND: Cambiar por rol real del usuario ---
+  const [userRole] = useState('auditor'); // --- NOTA BACKEND: Cambiar por rol real del usuario ---
   const [showModal, setShowModal] = useState(null); 
   const [showSuccess, setShowSuccess] = useState(false);
   const [proyectoAsignado, setProyectoAsignado] = useState('');
@@ -77,7 +77,7 @@ const ActivoDetalle = () => {
         );
       case 'auditor':
         return (
-          <button onClick={() => navigate(`/trazabilidad/${activo.id}`)} className="w-full bg-gray-800 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2">
+          <button onClick={() => navigate(`/auditor/trazabilidad/${activo.id}`)} className="w-full bg-gray-800 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2">
             <History size={20} /> Ver trazabilidad
           </button>
         );
