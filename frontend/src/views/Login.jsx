@@ -27,15 +27,23 @@ const Login = () => {
     setShow2FA(false);
 
     // --- NOTA PARA BACKEND: Aquí recibirán el rol desde su API de Auth ---
-    // Simulamos que el usuario es 'auditor' para probar vista 
-    const userRole = 'auditor'; 
+    // Simulamos que el usuario es 'ehs' para probar vista 
+    const userRole = 'security'; 
 
     if (userRole === 'admin') {
       navigate('/adminDashboard');
     } else if (userRole === 'auditor') {
       navigate('/auditordashboard');
-    } else {
-      navigate('/dashboard'); // Usuario regular
+    }else if (userRole === 'ehs'){
+      navigate('/approval');
+    }else if (userRole === 's&r'){
+      navigate('/shipping-control');
+    }else if (userRole === 'security'){
+      navigate('/scanner');
+    }else if (userRole === 'gerente'){
+      navigate('/dashboard');//modificar con el dashboard de gerente
+    }else {
+      navigate('/dashboard'); // Usuario regular, modificar con el dashboard de usuario
     }
   };
 

@@ -10,7 +10,7 @@ const Perfil = () => {
   const navigate = useNavigate();
 
   // --- NOTA PARA BACKEND: El rol debe venir de su sistema de Auth ---
-  const [userRole] = useState('admin'); // Probar con 'admin' o 'gerente'
+  const [userRole] = useState('security'); // Probar con 'admin' o 'gerente'
   const [showModal, setShowModal] = useState(null); // 'historial' o 'prestamos'
 
   const usuario = {
@@ -21,20 +21,30 @@ const Perfil = () => {
 
   // --- LÓGICA DE HISTORIAL POR ROL ---
   const historialPorRol = {
-    admin: [
+    'admin': [
       { text: "Diste acceso a Juan Pérez para aceptar solicitudes", date: "Hoy, 10:00 AM" },
       { text: "Pusiste al activo BetaWorks X300 en mantenimiento", date: "Ayer" },
       { text: "Añadiste un nuevo activo: Laptop Dell G15", date: "22/02/2026" }
     ],
-    gerente: [
+    'gerente': [
       { text: "Aceptaste la solicitud de Ana Pérez (X300)", date: "Hoy, 09:15 AM" },
       { text: "Rechazaste la solicitud de Juan Perez", date: "Ayer" },
       { text: "Firmaste el reporte de mantenimiento mensual", date: "21/02/2026" }
     ],
-    user: [
+    'ehs': [
+      {text: "Aceptaste la solicitus tipo Scrap de Lolita Ayala", date: "21/02/2026"}
+    ],
+    'user': [
       { text: "Devolviste el activo GammaTech Model B1", date: "Ayer" },
       { text: "Tu solicitud por el BetaWorks X300 fue aceptada", date: "20/02/2026" },
       { text: "Pediste el activo BetaWorks HIL-1000", date: "18/02/2026" }
+    ],
+    's&r': [
+      {text: "Validaste logística del pedido con folio: SF-9905", date: "Ayer"},
+      {text: "Marcaste rechazado el pedido con folio: SF-9904", date: "21/02/2026"}
+    ],
+    'security': [
+      {text: "Validaste salida del activo con ID: 10001", date: "21/02/2026"}
     ]
   };
 

@@ -11,7 +11,7 @@ const Notificaciones = () => {
   const navigate = useNavigate();
 
   // --- NOTA PARA BACKEND: Obtener el rol del Contexto de Usuario Global ---
-  const [userRole] = useState('admin'); 
+  const [userRole] = useState('s&r'); 
 
   // --- NOTA PARA BACKEND: Este array será el resultado de su consulta a la base de datos ---
   const todasLasNotificaciones = [
@@ -46,6 +46,14 @@ const Notificaciones = () => {
       descripcion: 'Se detectó movimiento en la trazabilidad del activo HIL-1000.',
       icon: <History className="text-purple-500" />,
       color: 'border-purple-100 bg-purple-50/30'
+    },
+    {
+      id: 5,
+      rol: 's&r',
+      titulo: 'Activo pendiente de envío',
+      descripcion: 'Tienes una nueva solicitud de envío.',
+      icon: <MessageSquare className="text-blue-500" />,
+      color: 'border-blue-100 bg-blue-50/30'
     }
   ];
 

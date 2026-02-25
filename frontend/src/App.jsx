@@ -17,6 +17,9 @@ import GestionarFirmas from './views/admin/GestionarFirmas';
 import AuditorDashboard from './views/auditor/AuditorDashboard';
 import Trazabilidad from './views/auditor/Trazabilidad';
 import BusquedaGlobal from './views/auditor/BusquedaGlobal';
+import RiskApproval from './views/ehs/RiskApproval';
+import ShippingControl from './views/logistics/ShippingControl';
+import Scanner from './views/security/Scanner';
 
 function App() {
   return (
@@ -29,6 +32,11 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/adminDashboard" element={<AdminDashboard />} />
         <Route path="/auditorDashboard" element={<AuditorDashboard />} />
+        <Route path="/approval" element={<RiskApproval />} />
+        <Route path="/shipping-control" element={<ShippingControl />} />
+        
+        {/* Ruta para el scanner general */}
+        <Route path="/scanner" element={<Scanner />} />
 
         {/* Rutas adicionales que definimos en el Navbar */}
         <Route path="/activos" element={<Activos/>} />
