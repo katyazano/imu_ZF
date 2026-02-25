@@ -7,16 +7,32 @@ const Navbar = () => {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
 
-  // --- NOTA PARA BACKEND: Obtener el rol del contexto global de la App ---
-  const [userRole] = useState('auditor'); 
+  // Función para determinar qué estamos buscando según el rol
+  const getSearchPlaceholder = () => {
+    if (userRole === 'ehs' || userRole === 'shipping') return "Buscar solicitudes...";
+    if (userRole === 'security') return "Buscar pase de salida...";
+    return "Buscar activos...";
+  };
 
-  // Función maestra para la "Regla de los 3 clics"
+  // --- NOTA PARA BACKEND: Obtener el rol del contexto global de la App ---
+  const [userRole] = useState('security'); 
+
+  // Función para ocultar cámara en Desktop y navegar en móvil
+  const handleCameraClick = () => {
+    navigate('/scanner'); // Asegúrate que esta ruta exista en App.jsx
+  };
+
+  // Función maestra para mostrar el dashboard de cada usuario
   const handleHomeClick = (e) => {
     e.preventDefault(); // Evitamos el comportamiento por defecto del Link si es necesario
     setIsOpen(false);
     if (userRole === 'admin') navigate('/adminDashboard');
     else if (userRole === 'auditor') navigate('/auditordashboard');
-    else navigate('/dashboard');
+    else if (userRole === 'ehs') navigate('/approval');
+    else if (userRole === 's&r') navigate('/shipping-control');
+    else if (userRole === 'security') navigate('/scanner');
+    else if (userRole === 'gerente') navigate('/dashboard');//modificar con el dashboard de gerente
+    else navigate('/dashboard');//modificar con el dashboard de usuario general
   };
 
 
@@ -40,11 +56,22 @@ const Navbar = () => {
           </button>
         </div>
 
+        {/* BUSCADOR CON CÁMARA INTELIGENTE */}
         <div className="flex-1 max-w-md mx-4">
           <div className="bg-white rounded-lg flex items-center px-3 py-1.5 text-gray-500 shadow-inner">
             <Search size={18} className="mr-2" />
-            <input type="text" className="w-full bg-transparent outline-none text-black text-sm" placeholder="Buscar activos..." />
-            <Camera size={18} className="ml-2 cursor-pointer active:text-blue-500" />
+            <input 
+              type="text" 
+              className="w-full bg-transparent outline-none text-black text-sm" 
+              placeholder={getSearchPlaceholder()} 
+            />
+            {/* OCULTO EN PC (lg:hidden) Y NAVEGA AL SCANNER */}
+            <button 
+              onClick={handleCameraClick}
+              className="lg:hidden ml-2 p-1 hover:bg-gray-100 rounded-md transition-colors text-[#0070BC]"
+            >
+              <Camera size={20} />
+            </button>
           </div>
         </div>
 
