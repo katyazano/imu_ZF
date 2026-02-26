@@ -1,52 +1,47 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { PrismaClient } = require('@prisma/client');
-const { PrismaPg } = require('@prisma/adapter-pg');
-const { Pool } = require('pg');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
-// --- CONFIGURACIÓN DEL ADAPTADOR (CRÍTICO PARA PRISMA 7) ---
-const connectionString = process.env.DATABASE_URL;
-
-// 1. Crear un Pool de conexión con PostgreSQL
-const pool = new Pool({ connectionString });
-
-// 2. Crear el adaptador de Prisma
-const adapter = new PrismaPg(pool);
-
-// 3. Inicializar Prisma usando el adaptador
-const prisma = new PrismaClient({ adapter });
-
+// Middlewares globales
+app.use(express.json()); // Vital para leer los { body } que mande React
 app.use(cors());
-app.use(express.json());
 
-// --- Health Checks ---
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'API ZF-Halo Online', version: '1.0.0' });
+// ==========================================
+// IMPORTACIÓN DE RUTAS (Tus 7 Módulos)
+// ==========================================
+const authRoutes = require('./routes/auth.routes');
+const catalogosRoutes = require('./routes/catalogos.routes');
+const activosRoutes = require('./routes/activos.routes');
+const bitacoraRoutes = require('./routes/bitacora.routes');
+const mantenimientosRoutes = require('./routes/mantenimientos.routes');
+const solicitudesRoutes = require('./routes/solicitudes.routes');
+const aprobacionesRoutes = require('./routes/aprobaciones.routes');
+const reglasRoutes = require('./routes/reglas.routes');
+const usuariosRoutes = require('./routes/usuarios.routes');
+const auditorRoutes = require('./routes/auditor.routes')
+
+// ==========================================
+// MONTAJE DE ENDPOINTS
+// ==========================================
+app.use('/api/auth', authRoutes);                       // Módulo 1
+app.use('/api/catalogos', catalogosRoutes);            // Módulo 2 (Catálogos)
+app.use('/api/activos', activosRoutes);                // Módulo 2 (Inventario)
+app.use('/api/solicitudes', solicitudesRoutes);         // Módulo 3
+app.use('/api/aprobaciones', aprobacionesRoutes);      // Módulo 3 (Firmas y aprobaciones)
+app.use('/api/bitacora', bitacoraRoutes);              // Módulo 4
+app.use('/api/mantenimientos', mantenimientosRoutes);  // Módulo 4
+app.use('/api/usuarios', usuariosRoutes);              // Módulo 5
+app.use('/api/reglas', reglasRoutes);                  // Módulo 6
+app.use('/api', auditorRoutes);                        // Módulo 7
+
+// Endpoint de prueba rápida
+app.get('/', (req, res) => {
+  res.send('🚀 API ZF Halo funcionando correctamente');
 });
 
-app.get('/api/db-check', async (req, res) => {
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    res.json({ status: 'Conexión Exitosa con PostgreSQL', db: 'zf_patrimonial' });
-  } catch (error) {
-    console.error('Error DB:', error);
-    res.status(500).json({ error: 'Error de conexión', details: error.message });
-  }
-});
-
-// Endpoint de Activos (Ejemplo)
-app.get('/api/activos', async (req, res) => {
-  try {
-    const activos = await prisma.activo.findMany({ take: 50 });
-    res.json(activos);
-  } catch (error) {
-    res.status(500).json({ error: 'Error obteniendo activos' });
-  }
-});
-
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+const PORT = process.env.PORT || 4000;
+app.listen(PORT, () => {
+  console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
 });

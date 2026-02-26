@@ -1,61 +1,109 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, ShieldCheck } from 'lucide-react';
+import { User, Lock } from 'lucide-react';
+import ReCAPTCHA from "react-google-recaptcha"; // Importamos la librería real
 import zfLogo from '../assets/zf-logo.png';
 import Modal2FA from '../components/Modal2FA';
 
 const Login = () => {
   const navigate = useNavigate();
+  
+  // Estados del formulario
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [show2FA, setShow2FA] = useState(false);
-  const [isCaptchaDone, setIsCaptchaDone] = useState(false);
+  
+  // Estado para el Token que nos da Google
+  const [captchaToken, setCaptchaToken] = useState(null);
+  
+  // Estados para la conexión con el Backend
+  const [userId, setUserId] = useState(null); 
+  const [errorBackend, setErrorBackend] = useState(''); 
 
-  // Simulación del flujo de Login
-  const handleInitialLogin = (e) => {
+  // ==========================================
+  // 1. PRIMER PASO: Validar usuario, password y Captcha
+  // ==========================================
+  const handleInitialLogin = async (e) => {
     e.preventDefault();
-    if (isCaptchaDone) {
-      // Si el captcha está "listo", abrimos el modal de 2FA
-      setShow2FA(true);
-    } else {
-      alert("Por favor, confirma que no eres un robot.");
+    setErrorBackend(''); 
+
+    // UX: Validación inmediata del Captcha en el Front
+    if (!captchaToken) {
+      setErrorBackend("Por favor, confirma que no eres un robot en el recuadro de abajo.");
+      return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:4000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            email: email, 
+            password: password,
+            captchaToken: captchaToken // Enviamos el token real al backend
+        }) 
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        if (data.requires2fa) { 
+          setUserId(data.userId); 
+          setShow2FA(true); 
+        } else {
+          localStorage.setItem('token', data.token);
+          if (data.user?.id_rol) localStorage.setItem('rol', data.user.id_rol);
+          navigate('/adminDashboard');
+        }
+      } else {
+        // Importante: Si el backend rechaza el login, Google recomienda resetear el captcha
+        setErrorBackend(data.error || 'Credenciales incorrectas');
+      }
+    } catch (error) {
+      console.error("Error de red:", error);
+      setErrorBackend("No se pudo conectar con el servidor.");
     }
   };
 
-  const handleFinalVerify = (codigoIngresado) => {
-    console.log("Código 2FA recibido en Login:", codigoIngresado);
-    setShow2FA(false);
+  // ==========================================
+  // 2. SEGUNDO PASO: Validar código 2FA
+  // ==========================================
+  const handleFinalVerify = async (codigoIngresado) => {
+    try {
+      const response = await fetch('http://localhost:4000/api/auth/verify-2fa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: userId, codigo2FA: codigoIngresado })
+      });
 
-    // --- NOTA PARA BACKEND: Aquí recibirán el rol desde su API de Auth ---
-    // Simulamos que el usuario es 'auditor' para probar vista 
-    const userRole = 'auditor'; 
+      const data = await response.json();
 
-    if (userRole === 'admin') {
-      navigate('/adminDashboard');
-    } else if (userRole === 'auditor') {
-      navigate('/auditordashboard');
-    } else {
-      navigate('/dashboard'); // Usuario regular
+      if (response.ok) {
+        localStorage.setItem('token', data.token);
+        if (data.user?.id_rol) localStorage.setItem('rol', data.user.id_rol);
+        setShow2FA(false);
+        navigate('/adminDashboard'); 
+      } else {
+        alert(data.error || "Código de verificación incorrecto");
+      }
+    } catch (error) {
+      console.error("Error verificando 2FA:", error);
+      alert("Error de conexión al verificar el código.");
     }
   };
 
   return (
     <div className="relative min-h-screen flex flex-col items-center justify-center bg-white overflow-hidden font-sans">
       
-      {/* Fondo: Triángulo Superior */}
-      <div 
-        className="absolute top-0 left-0 w-full h-20 bg-[#0070BC] z-0" 
-        style={{ clipPath: 'polygon(0 0, 50% 0, 0 100%)' }}
-      ></div>
+      {/* Fondo Decorativo */}
+      <div className="absolute top-0 left-0 w-full h-20 bg-[#0070BC] z-0" style={{ clipPath: 'polygon(0 0, 50% 0, 0 100%)' }}></div>
 
       <div className="relative z-10 w-full max-w-sm px-8 flex flex-col items-center -mt-10">
         
-        {/* Logo ZF */}
         <div className="mb-2 mt-12">
           <img src={zfLogo} alt="ZF Logo" className="w-32 h-auto object-contain" />
         </div>
 
-        {/* Header */}
         <div className="flex flex-col items-center mb-3">
           <h1 className="text-5xl font-black text-gray-900 leading-tight">Welcome</h1>
           <div className="w-32 h-2 bg-[#0070BC] mt-1"></div>
@@ -63,6 +111,13 @@ const Login = () => {
 
         {/* Card Formulario */}
         <div className="w-full bg-[#D1E9FF] rounded-[45px] p-10 shadow-xl">
+          
+          {errorBackend && (
+            <div className="mb-4 bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded text-sm font-semibold text-center">
+              {errorBackend}
+            </div>
+          )}
+
           <form onSubmit={handleInitialLogin} className="flex flex-col gap-6">
             
             <div className="relative border-b-2 border-gray-400 flex items-center pb-2">
@@ -85,18 +140,13 @@ const Login = () => {
               <Lock className="text-gray-600 w-6 h-6 ml-2" />
             </div>
 
-            {/* Simulación Visual de CAPTCHA */}
-            <div 
-              onClick={() => setIsCaptchaDone(!isCaptchaDone)}
-              className="bg-gray-50 border border-gray-300 rounded-lg p-3 flex items-center justify-between cursor-pointer hover:bg-white transition-all shadow-sm"
-            >
-              <div className="flex items-center gap-3">
-                <div className={`w-6 h-6 border-2 rounded flex items-center justify-center transition-colors ${isCaptchaDone ? 'bg-green-500 border-green-500' : 'bg-white border-gray-400'}`}>
-                  {isCaptchaDone && <ShieldCheck size={18} className="text-white" />}
-                </div>
-                <span className="text-sm text-gray-600 font-medium">No soy un robot</span>
-              </div>
-              <img src="https://www.gstatic.com/recaptcha/api2/logo_48.png" alt="reCAPTCHA" className="w-8 h-8 opacity-70" />
+            {/* --- COMPONENTE GOOGLE RECAPTCHA REAL --- */}
+            <div className="flex justify-center scale-90 -mx-10 transform origin-center">
+              <ReCAPTCHA
+                sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI" // Esta es una Site Key de prueba de Google
+                onChange={(token) => setCaptchaToken(token)}
+                onExpired={() => setCaptchaToken(null)}
+              />
             </div>
 
             <div className="flex flex-col gap-5 mt-2">
@@ -106,8 +156,9 @@ const Login = () => {
 
               <button 
                 type="submit" 
+                disabled={!captchaToken}
                 className={`w-full font-bold py-4 rounded-2xl text-2xl shadow-lg transition-all active:scale-95
-                  ${isCaptchaDone ? 'bg-[#0070BC] text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+                  ${captchaToken ? 'bg-[#0070BC] text-white hover:bg-blue-700' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
               >
                 Login
               </button>
@@ -116,13 +167,8 @@ const Login = () => {
         </div>
       </div>
 
-      {/* Fondo: Triángulo Inferior */}
-      <div 
-        className="absolute bottom-0 right-0 w-full h-32 bg-[#0070BC] z-0" 
-        style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 100%)' }}
-      ></div>
+      <div className="absolute bottom-0 right-0 w-full h-32 bg-[#0070BC] z-0" style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 100%)' }}></div>
 
-      {/* Modal de 2FA */}
       <Modal2FA 
         isOpen={show2FA} 
         onClose={() => setShow2FA(false)} 
