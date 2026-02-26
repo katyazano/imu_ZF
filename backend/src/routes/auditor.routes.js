@@ -4,7 +4,8 @@ const {
     getVencidos, 
     getAlertas, 
     exportarReportes,
-    getHistorialWeb
+    getHistorialWeb,
+    getTrazabilidadActivo
 } = require('../controllers/auditor.controller');
 
 // 1. Importamos tu guardia de seguridad (Middleware)
@@ -28,5 +29,8 @@ router.get('/reportes/exportar', verificarToken, exportarReportes);
 
 // Endpoint para historial web
 router.get('/reportes/historial', verificarToken, getHistorialWeb);
+
+// Endpoint para trazabilidad de un activo específico
+router.get('/trazabilidad/:id', verificarToken, getTrazabilidadActivo);
 
 module.exports = router;

@@ -4,51 +4,127 @@ const fs = require('fs');
 const path = require('path');
 
 // ==========================================
-// 1. ENDPOINT: DASHBOARD KPIs
+// 1. ENDPOINT: DASHBOARD KPIs (100% REAL Y DINÁMICO)
 // ==========================================
-// Devuelve los totales matemáticos para las gráficas del Auditor
 const getDashboardKPIs = async (req, res) => {
   try {
-    // Validación de rol: Solo Admin, Gerente y Auditor pueden ver estos KPIs
     const id_rol = req.usuario_token.id_rol;
-    if (![1, 3, 7].includes(id_rol)) { // Admin, Gerente, Auditor
+    if (![1, 2, 3, 7].includes(id_rol)) { 
       return res.status(403).json({ error: "No tienes permiso para ver los KPIs." });
     }
 
-    // 1. Contar el total de activos registrados
-    const total_activos = await prisma.activos.count();
+    // ⏱️ 1. ATRAPAMOS EL FILTRO DE TIEMPO DESDE REACT
+    const { periodo } = req.query; // 'Hoy', '7d', o '30d'
+    let fechaLimite = new Date();
+    
+    if (periodo === 'Hoy') {
+      fechaLimite.setHours(0, 0, 0, 0); // Desde las 00:00:00 de hoy
+    } else if (periodo === '7d') {
+      fechaLimite.setDate(fechaLimite.getDate() - 7); 
+    } else if (periodo === '30d') {
+      fechaLimite.setDate(fechaLimite.getDate() - 30); 
+    } else {
+      fechaLimite = new Date('2000-01-01'); // Todo
+    }
 
-    // 2. Contar cuántos están prestados actualmente
+    // --------------------------------------------------------
+    // A. BLOQUE KPIs PRINCIPALES
+    // --------------------------------------------------------
+    const total_activos = await prisma.activos.count();
     const prestados_actualmente = await prisma.activos.count({
-      where: {
-        estado_maquina: { id_estado_maquina: '3' }
-      }
+      where: { id_estado_maquina: 3 } 
+    });
+    const total_alertas = await prisma.registro_alertas_retrasos.count({
+      where: { fecha_envio: { gte: fechaLimite } }
     });
 
-    // 3. Uso por disciplina (Agrupamos activos por ID de disciplina)
+    // --------------------------------------------------------
+    // B. BLOQUE GRÁFICA: STOCK POR ALMACÉN
+    // --------------------------------------------------------
     const activosPorDisciplina = await prisma.activos.groupBy({
       by: ['id_disciplina'],
       _count: { id_activo: true },
     });
 
-    // Traemos el catálogo de áreas para mapear el ID al nombre real
     const disciplinas = await prisma.disciplinas_areas.findMany();
     
-    const uso_por_disciplina = {};
-    activosPorDisciplina.forEach(item => {
+    const stock_almacen = activosPorDisciplina.map(item => {
       const nombreArea = disciplinas.find(d => d.id_disciplina === item.id_disciplina)?.nombre || 'Desconocida';
-      uso_por_disciplina[nombreArea] = item._count.id_activo;
+      return { name: nombreArea, stock: item._count.id_activo };
     });
 
+    // --------------------------------------------------------
+    // C. BLOQUE GRÁFICA: ESTADO GENERAL
+    // --------------------------------------------------------
+    const activosPorEstado = await prisma.activos.groupBy({
+      by: ['id_estado_maquina'],
+      _count: { id_activo: true }
+    });
+
+    const estados = await prisma.estados_maquina.findMany(); 
+    
+    const estado_general = activosPorEstado.map(item => {
+      const nombreEstado = estados.find(e => e.id_estado_maquina === item.id_estado_maquina)?.nombre || 'DESCONOCIDO';
+      return { name: nombreEstado.toUpperCase(), value: item._count.id_activo };
+    });
+
+    // --------------------------------------------------------
+    // D. 🛠️ NUEVO: GRÁFICA DE MANTENIMIENTOS REAL
+    // --------------------------------------------------------
+    // Buscamos los mantenimientos reportados desde la fecha límite
+    const mantenimientos = await prisma.mantenimientos_incidencias.findMany({
+      where: { fecha_reporte: { gte: fechaLimite } },
+      select: { fecha_reporte: true },
+      orderBy: { fecha_reporte: 'asc' } // Orden cronológico
+    });
+
+    // Los agrupamos dependiendo del botón que presionaste
+    const agrupado = {};
+    mantenimientos.forEach(m => {
+      const fecha = new Date(m.fecha_reporte);
+      let clave = '';
+
+      if (periodo === 'Hoy') {
+        clave = `${fecha.getHours()}:00`; // Agrupar por hora (ej. "14:00")
+      } else {
+        // Agrupar por Día/Mes (ej. "24/02")
+        const dia = String(fecha.getDate()).padStart(2, '0');
+        const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+        clave = `${dia}/${mes}`;
+      }
+
+      agrupado[clave] = (agrupado[clave] || 0) + 1;
+    });
+
+    // Lo convertimos al formato exacto que espera tu código de React
+    // Nota: Seguimos usando la palabra 'month' como llave para no romper tu frontend
+    let historial_mantenimientos = Object.keys(agrupado).map(key => ({
+      month: key, 
+      mant: agrupado[key]
+    }));
+
+    // Si no ha habido mantenimientos en ese periodo, mandamos un dato en ceros
+    if (historial_mantenimientos.length === 0) {
+      historial_mantenimientos = [{ month: 'Sin datos', mant: 0 }];
+    }
+
+    // --------------------------------------------------------
+    // E. ENSAMBLAJE FINAL PARA REACT
+    // --------------------------------------------------------
     res.json({
-      total_activos,
-      prestados_actualmente,
-      uso_por_disciplina
+      kpis: {
+        total: total_activos,
+        prestados: prestados_actualmente,
+        alertas: total_alertas
+      },
+      stock_almacen: stock_almacen,
+      estado_general: estado_general,
+      historial_mantenimientos: historial_mantenimientos // <-- ¡Datos vivos!
     });
 
   } catch (error) {
     console.error('Error en getDashboardKPIs:', error);
-    res.status(500).json({ status: 'error', mensaje: 'Error al calcular los KPIs' });
+    res.status(500).json({ status: 'error', mensaje: 'Error interno al calcular los KPIs' });
   }
 };
 
@@ -274,10 +350,115 @@ const getHistorialWeb = async (req, res) => {
   }
 };
 
+// ==========================================
+// 6. ENDPOINT: TRAZABILIDAD DE UN ACTIVO (HISTORIAL COMPLETO)
+// ==========================================
+const getTrazabilidadActivo = async (req, res) => {
+  try {
+    // Validación de rol: Admin (1), Gerente (2), Auditor (7)
+    const id_rol = req.usuario_token.id_rol;
+    if (![1, 2, 3, 7].includes(id_rol)) { 
+      return res.status(403).json({ error: "No tienes permiso para ver la trazabilidad." });
+    }
+
+    const { id } = req.params;
+    const idActivo = parseInt(id);
+
+    if (isNaN(idActivo)) {
+      return res.status(400).json({ error: "ID de activo inválido." });
+    }
+
+    // 1. Buscar los datos básicos del Activo
+    const activoFisico = await prisma.activos.findUnique({
+      where: { id_activo: idActivo },
+      include: {
+        estado_maquina: true
+      }
+    });
+
+    if (!activoFisico) {
+      return res.status(404).json({ error: "No se encontró el activo solicitado." });
+    }
+
+    // 2. Buscar todas las Solicitudes (Préstamos/Asignaciones)
+    const solicitudes = await prisma.solicitudes.findMany({
+      where: { id_activo: idActivo },
+      include: { solicitante: true },
+    });
+
+    // 3. Buscar todos los Mantenimientos
+    const mantenimientos = await prisma.mantenimientos_incidencias.findMany({
+      where: { id_activo: idActivo },
+      include: { reportador: true }
+    });
+
+    // 4. Construir la "Línea de Tiempo" (Historial unificado)
+    let historialCrudo = [];
+
+    // A. Registrar la fecha de compra/alta original si existe
+    if (activoFisico.fecha_compra) {
+      historialCrudo.push({
+        tipo: 'ADQUISICIÓN',
+        detalle: `Registrado en sistema. Marca: ${activoFisico.marca || 'N/A'}`,
+        fechaReal: new Date(activoFisico.fecha_compra)
+      });
+    }
+
+    // B. Mapear las solicitudes
+    solicitudes.forEach(sol => {
+      historialCrudo.push({
+        tipo: `PRÉSTAMO - ${sol.estatus_general.toUpperCase()}`,
+        detalle: `A: ${sol.solicitante?.nombre_completo || 'Usuario desconocido'}`,
+        fechaReal: new Date(sol.fecha_creacion)
+      });
+    });
+
+    // C. Mapear los mantenimientos
+    mantenimientos.forEach(mant => {
+      historialCrudo.push({
+        tipo: `MANTENIMIENTO - ${mant.estatus_reparacion.toUpperCase()}`,
+        detalle: mant.descripcion,
+        fechaReal: new Date(mant.fecha_reporte)
+      });
+    });
+
+    // 5. Ordenar todo por fecha (De lo más nuevo a lo más viejo)
+    historialCrudo.sort((a, b) => b.fechaReal - a.fechaReal);
+
+    // 6. Formatear la fecha a texto amigable para React (DD/MM/YYYY)
+    const historialFinal = historialCrudo.map(item => {
+      const dia = String(item.fechaReal.getDate()).padStart(2, '0');
+      const mes = String(item.fechaReal.getMonth() + 1).padStart(2, '0');
+      const anio = item.fechaReal.getFullYear();
+      
+      return {
+        tipo: item.tipo,
+        detalle: item.detalle,
+        fecha: `${dia}/${mes}/${anio}`
+      };
+    });
+
+    // 7. Enviar la respuesta exacta que espera React
+    res.json({
+      activo: {
+        id_activo: activoFisico.id_activo,
+        nombre_maquina: activoFisico.nombre_maquina,
+        estado: activoFisico.estado_maquina?.nombre || 'Desconocido'
+      },
+      historial: historialFinal
+    });
+
+  } catch (error) {
+    console.error('Error en getTrazabilidadActivo:', error);
+    res.status(500).json({ status: 'error', mensaje: 'Error al obtener la trazabilidad del activo' });
+  }
+};
+
 module.exports = {
   getDashboardKPIs,
   getVencidos,
   getAlertas,
   exportarReportes,
-  getHistorialWeb
+  getHistorialWeb,
+  getTrazabilidadActivo
 };

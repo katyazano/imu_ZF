@@ -34,7 +34,7 @@ app.use('/api/bitacora', bitacoraRoutes);              // Módulo 4
 app.use('/api/mantenimientos', mantenimientosRoutes);  // Módulo 4
 app.use('/api/usuarios', usuariosRoutes);              // Módulo 5
 app.use('/api/reglas', reglasRoutes);                  // Módulo 6
-app.use('/api', auditorRoutes);                        // Módulo 7
+app.use('/api/auditoria', auditorRoutes);              // Módulo 7
 
 // Endpoint de prueba rápida
 app.get('/', (req, res) => {

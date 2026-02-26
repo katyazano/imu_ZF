@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, History, Package, User, 
-  Settings, Truck, Info, CheckCircle2 
+  Settings, Truck, Info, CheckCircle2, AlertTriangle, Loader2 
 } from 'lucide-react';
 import Navbar from '../../components/Navbar';
 
@@ -10,120 +10,161 @@ const Trazabilidad = () => {
   const navigate = useNavigate();
   const { id } = useParams();
 
-  // --- NOTA PARA BACKEND: Este historial debe venir de una consulta JOIN a las tablas 
-  // de Préstamos, Mantenimientos y Logs de Inventario del activo con este ID ---
-  const historialActivo = [
-    {
-      tipo: 'ADQUISICIÓN',
-      detalle: 'Factura #2025-001',
-      fecha: '02/11/2025',
-      icon: <Package className="text-blue-500" />,
-      lineColor: 'border-blue-500'
-    },
-    {
-      tipo: 'ASIGNADO',
-      detalle: 'A Juan Pérez (Proyecto "Alpha")',
-      fecha: '06/11/2025',
-      icon: <User className="text-gray-400" />,
-      lineColor: 'border-gray-300'
-    },
-    {
-      tipo: 'MOVIMIENTO',
-      detalle: 'De "Almacén A" a "Oficina A"',
-      fecha: '23/11/2025',
-      icon: <Truck className="text-[#28B4AD]" />,
-      lineColor: 'border-[#28B4AD]'
-    },
-    {
-      tipo: 'MANTENIMIENTO',
-      detalle: 'Revisión programada preventiva',
-      fecha: '20/12/2025',
-      icon: <Settings className="text-orange-400" />,
-      lineColor: 'border-orange-400'
-    },
-    {
-      tipo: 'PRÉSTAMO ACTUAL',
-      detalle: 'A María Carmen Gómez (Proyecto "Beta")',
-      fecha: '25/01/2026',
-      icon: <CheckCircle2 className="text-[#0070BC]" />,
-      lineColor: 'border-[#0070BC]'
+  // --- ESTADOS DINÁMICOS ---
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [activoInfo, setActivoInfo] = useState(null);
+  const [historialActivo, setHistorialActivo] = useState([]);
+
+  // --- CARGA DE DATOS ---
+  useEffect(() => {
+    const fetchTrazabilidad = async () => {
+      try {
+        setLoading(true);
+        const token = localStorage.getItem('token');
+        
+        // Petición al backend
+        const response = await fetch(`http://localhost:4000/api/auditoria/trazabilidad/${id}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) throw new Error('No se encontró el historial de este activo');
+        
+        const data = await response.json();
+        
+        setActivoInfo(data.activo);
+        setHistorialActivo(data.historial);
+
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTrazabilidad();
+  }, [id]);
+
+  // --- DICCIONARIO VISUAL (Mapea el texto del backend a Iconos/Colores) ---
+  const getEventUI = (tipoEvento) => {
+    const tipo = tipoEvento.toUpperCase();
+    
+    if (tipo.includes('ADQUISICIÓN') || tipo.includes('ALTA')) {
+      return { icon: <Package size={20} className="text-blue-500" />, color: 'border-blue-500', text: 'text-blue-500' };
     }
-  ];
+    if (tipo.includes('MANTENIMIENTO') || tipo.includes('REPARACIÓN')) {
+      return { icon: <Settings size={20} className="text-orange-500" />, color: 'border-orange-500', text: 'text-orange-500' };
+    }
+    if (tipo.includes('ASIGNADO') || tipo.includes('PRÉSTAMO')) {
+      return { icon: <User size={20} className="text-[#28B4AD]" />, color: 'border-[#28B4AD]', text: 'text-[#28B4AD]' };
+    }
+    if (tipo.includes('MOVIMIENTO') || tipo.includes('CASETA')) {
+      return { icon: <Truck size={20} className="text-purple-500" />, color: 'border-purple-500', text: 'text-purple-500' };
+    }
+    if (tipo.includes('DEVOLUCIÓN')) {
+      return { icon: <CheckCircle2 size={20} className="text-green-500" />, color: 'border-green-500', text: 'text-green-500' };
+    }
+    
+    // Por defecto
+    return { icon: <Info size={20} className="text-gray-400" />, color: 'border-gray-300', text: 'text-gray-500' };
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col font-sans pb-32">
       <Navbar />
 
-      {/* Header Estilo ZF */}
-     <div className="bg-[#0070BC] p-8 pt-12 pb-20 shadow-lg">
-      <div className="relative flex items-center justify-center min-h-[40px]">
-        
-        {/* Botón Volver - Posicionado a la izquierda */}
+      {/* --- NUEVO HEADER (Idéntico a Activos.jsx) --- */}
+      <header className="px-6 mt-8 flex items-center justify-between relative">
+        {/* Tu botón exacto con navigate(-1) para no perder los filtros al volver */}
         <button 
-          onClick={() => navigate('/auditorDashboard')} 
-          className="absolute left-0 flex flex-col items-center text-white hover:scale-105 transition-transform group"
+          onClick={() => navigate(-1)} 
+          className="flex items-center text-[#0070BC] font-bold active:scale-95 transition-transform z-10 hover:underline"
         >
-          <ArrowLeft size={24} />
-          <span className="text-[8px] font-black uppercase tracking-tighter mt-1 opacity-80 group-hover:opacity-100">
-            Volver al Dashboard
-          </span>
+          <ArrowLeft size={20} className="mr-1" /> Volver
         </button>
 
-        {/* Título Principal - Centrado en la página */}
-        <h1 className="text-xl font-black text-white italic uppercase tracking-tighter text-center max-w-[180px] leading-tight">
-          Trazabilidad de activo
-        </h1>
+        {/* Título centrado con la línea azul de ZF */}
+        <div className="absolute left-0 right-0 text-center pointer-events-none">
+          <h1 className="text-2xl md:text-3xl font-black text-gray-900 leading-none uppercase italic tracking-tight">Trazabilidad</h1>
+          <div className="w-12 h-1.5 bg-[#0070BC] mx-auto mt-1.5 rounded-full"></div>
         </div>
-      </div>
+      </header>
 
-      <main className="px-6 -mt-12 flex-1">
-        {/* Card Informativa del Activo */}
-        <div className="bg-white rounded-[35px] p-6 shadow-xl shadow-blue-900/5 mb-8 border border-blue-50">
-          <div className="flex justify-between items-start mb-2">
-            <div>
-              <h2 className="text-2xl font-black text-gray-900 leading-none">ACTIVO ID: {id || '10001'}</h2>
-              <p className="text-sm font-bold text-gray-400 mt-2">BetaWorks Serie X300</p>
-            </div>
-            <span className="bg-orange-50 text-orange-600 text-[10px] font-black px-3 py-1 rounded-full uppercase italic">
-              En préstamo
-            </span>
-          </div>
-        </div>
-
-        {/* Línea de Tiempo (Timeline) */}
-        <div className="bg-white rounded-[35px] p-8 shadow-sm border border-gray-100">
-          <h3 className="text-sm font-black text-gray-900 uppercase tracking-[0.2em] mb-10 flex items-center gap-2">
-            <History size={18} className="text-[#0070BC]" /> Historial completo
-          </h3>
-
-          <div className="relative">
-            {historialActivo.map((evento, index) => (
-              <div key={index} className="flex gap-6 mb-10 last:mb-0 relative">
-                {/* La línea conectora vertical */}
-                {index !== historialActivo.length - 1 && (
-                  <div className={`absolute left-[19px] top-10 w-[2px] h-full border-l-2 border-dashed ${evento.lineColor}`}></div>
-                )}
-                
-                {/* El círculo con el icono */}
-                <div className={`z-10 w-10 h-10 rounded-full bg-white border-2 flex items-center justify-center shadow-sm ${evento.lineColor.replace('border-', 'text-')}`}>
-                  {evento.icon}
+      {/* Contenido principal */}
+      <main className="px-6 mt-10 flex-1 relative z-10">
+        
+        {/* MANEJO DE ESTADOS (Loader y Errores) */}
+        {loading ? (
+           <div className="bg-white rounded-[35px] p-12 shadow-xl flex flex-col items-center justify-center mt-4">
+              <Loader2 className="animate-spin text-[#0070BC] mb-4" size={40} />
+              <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">Reconstruyendo historial...</p>
+           </div>
+        ) : error ? (
+           <div className="bg-red-50 rounded-[35px] p-8 shadow-xl border border-red-100 text-center mt-4">
+              <AlertTriangle className="text-red-500 mx-auto mb-3" size={40} />
+              <p className="text-red-600 font-bold">{error}</p>
+              <button onClick={() => navigate(-1)} className="mt-4 text-[#0070BC] font-black uppercase text-[10px] tracking-widest underline">Regresar</button>
+           </div>
+        ) : (
+          <>
+            {/* Card Informativa del Activo (Datos Reales) */}
+            <div className="bg-white rounded-[35px] p-6 shadow-xl shadow-blue-900/5 mb-8 border border-blue-50">
+              <div className="flex justify-between items-start mb-2">
+                <div>
+                  <h2 className="text-2xl font-black text-gray-900 leading-none">ACTIVO ID: {activoInfo?.id_activo || id}</h2>
+                  <p className="text-sm font-bold text-gray-400 mt-2">{activoInfo?.nombre_maquina || 'Equipo sin nombre'}</p>
                 </div>
-
-                {/* El texto descriptivo */}
-                <div className="flex-1 pt-1">
-                  <div className="flex flex-col">
-                    <h4 className="font-black text-[11px] text-gray-900 uppercase tracking-widest leading-none mb-1">
-                      {evento.tipo}: <span className="text-gray-400 font-bold lowercase tracking-normal italic text-xs">{evento.detalle}</span>
-                    </h4>
-                    <span className="text-[10px] font-black text-[#0070BC] uppercase tracking-tighter">
-                      el {evento.fecha}
-                    </span>
-                  </div>
-                </div>
+                <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase italic
+                  ${activoInfo?.estado === 'Disponible' ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-600'}`}>
+                  {activoInfo?.estado || 'Desconocido'}
+                </span>
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
+
+            {/* Línea de Tiempo (Timeline Real) */}
+            <div className="bg-white rounded-[35px] p-8 shadow-sm border border-gray-100">
+              <h3 className="text-sm font-black text-gray-900 uppercase tracking-[0.2em] mb-10 flex items-center gap-2">
+                <History size={18} className="text-[#0070BC]" /> Historial completo
+              </h3>
+
+              <div className="relative">
+                {historialActivo.length > 0 ? (
+                  historialActivo.map((evento, index) => {
+                    const ui = getEventUI(evento.tipo); // Traducimos el tipo a colores
+                    
+                    return (
+                      <div key={index} className="flex gap-6 mb-10 last:mb-0 relative animate-in slide-in-from-bottom-5 fade-in duration-500" style={{ animationDelay: `${index * 100}ms` }}>
+                        {/* Línea conectora vertical */}
+                        {index !== historialActivo.length - 1 && (
+                          <div className={`absolute left-[19px] top-10 w-[2px] h-full border-l-2 border-dashed ${ui.color}`}></div>
+                        )}
+                        
+                        {/* Círculo con Icono */}
+                        <div className={`z-10 w-10 h-10 rounded-full bg-white border-2 flex items-center justify-center shadow-sm ${ui.color}`}>
+                          {ui.icon}
+                        </div>
+
+                        {/* Texto Descriptivo */}
+                        <div className="flex-1 pt-1">
+                          <div className="flex flex-col">
+                            <h4 className={`font-black text-[11px] uppercase tracking-widest leading-none mb-1 ${ui.text}`}>
+                              {evento.tipo}: <span className="text-gray-500 font-bold lowercase tracking-normal italic text-xs">{evento.detalle}</span>
+                            </h4>
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter mt-1">
+                              {evento.fecha}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-center text-gray-400 font-bold italic text-sm">Este activo es nuevo y aún no tiene historial registrado.</p>
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </main>
     </div>
   );
