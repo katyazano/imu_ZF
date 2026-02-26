@@ -4,7 +4,7 @@ import {
   Search, Camera, ChevronRight, CheckCircle, 
   Settings, Users, Bell, User, Home 
 } from 'lucide-react';
-import Navbar from '../components/Navbar';
+import Navbar from '../../components/Navbar';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();

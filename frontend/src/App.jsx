@@ -5,14 +5,18 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Login from './views/Login';
 import Dashboard from './views/Dashboard';
 import Activos from './views/Activos';
-import AdminDashboard from './views/AdminDashboard';
+import AdminDashboard from './views/admin/AdminDashboard';
 import PrestamosActivos from './views/PrestamosActivos';
 import ActivoDetalle from './views/ActivoDetalle';
-import EditarActivo from './views/EditarActivo';
-import NuevoActivo from './views/NuevoActivo';
-import AdminMantenimiento from './views/AdminMantenimiento';
+import EditarActivo from './views/admin/EditarActivo';
+import NuevoActivo from './views/admin/NuevoActivo';
+import AdminMantenimiento from './views/admin/AdminMantenimiento';
 import Notificaciones from './views/Notificaciones';
 import Perfil from './views/Perfil';
+import GestionarFirmas from './views/admin/GestionarFirmas';
+import AuditorDashboard from './views/auditor/AuditorDashboard';
+import Trazabilidad from './views/auditor/Trazabilidad';
+import BusquedaGlobal from './views/auditor/BusquedaGlobal';
 
 function App() {
   return (
@@ -24,6 +28,7 @@ function App() {
         {/* Ruta principal: Dashboard */}
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/adminDashboard" element={<AdminDashboard />} />
+        <Route path="/auditorDashboard" element={<AuditorDashboard />} />
 
         {/* Rutas adicionales que definimos en el Navbar */}
         <Route path="/activos" element={<Activos/>} />
@@ -35,7 +40,14 @@ function App() {
         <Route path="/activo/:id" element={<ActivoDetalle />} />
         <Route path="/editar-activo/:id" element={<EditarActivo />} />   
         <Route path="/nuevo-activo" element={<NuevoActivo />} />  
+        
+        {/* Rutas adicionales admin */}
         <Route path="/admin-mantenimiento" element={<AdminMantenimiento />} />
+        <Route path="/firmas" element={<GestionarFirmas />} />
+
+        {/* Rutas adicionales auditor */}
+        <Route path="/auditor/trazabilidad/:id" element={<Trazabilidad />} />
+        <Route path="/auditor/busqueda" element={<BusquedaGlobal />} />
 
         {/* Redirección por si el usuario entra a una ruta que no existe */}
         <Route path="*" element={<Navigate to="/" />} />
