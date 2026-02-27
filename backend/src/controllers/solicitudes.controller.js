@@ -240,17 +240,31 @@ const getSolicitudPorId = async (req, res) => {
       return res.status(404).json({ error: "Solicitud no encontrada" });
     }
 
-    // Formateamos la respuesta para que empate 100% con tu documento
+    // Formateamos la respuesta 
     const respuestaFormateada = {
       id_solicitud: solicitud.id_solicitud,
       estatus_general: solicitud.estatus_general,
+      
+      // AGREGAMOS LOS CAMPOS LOGÍSTICOS QUE FALTABAN
+      tipo_salida: solicitud.tipo_salida,
+      fecha_salida_programada: solicitud.fecha_salida_programada,
+      fecha_devolucion_programada: solicitud.fecha_devolucion_programada,
+      metodo_transporte: solicitud.metodo_transporte,
+      id_destino: solicitud.id_destino,
+
       activo: {
         nombre_maquina: solicitud.activo?.nombre_maquina || "Desconocido"
       },
       solicitante: {
         nombre_completo: solicitud.solicitante?.nombre_completo || "Desconocido"
       },
-      firmas: solicitud.firmas
+      
+      // TRADUCCIÓN DE FIRMAS: Convertimos la lista de Prisma al formato que espera React
+      firmas: {
+        gerente: solicitud.firmas.find(f => f.id_rol_esperado === 3)?.estatus_firma || 'Pendiente',
+        syr: solicitud.firmas.find(f => f.id_rol_esperado === 4)?.estatus_firma || 'Pendiente',
+        ehs: solicitud.firmas.find(f => f.id_rol_esperado === 5)?.estatus_firma || 'Pendiente'
+      }
     };
 
     res.status(200).json(respuestaFormateada);
