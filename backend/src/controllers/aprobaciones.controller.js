@@ -1,5 +1,6 @@
 const prisma = require('../services/prisma');
 
+// ruta /pendientes
 const getFirmasPendientes = async (req, res) => {
   try {
     const mi_id = req.usuario_token.id;
@@ -18,13 +19,17 @@ const getFirmasPendientes = async (req, res) => {
     // 3. Buscamos TODAS las firmas pendientes para esos roles
     const firmas = await prisma.aprobaciones_firma.findMany({
       where: {
-        id_rol_esperado: { in: roles_autorizados }, // <-- MAGIA: Busca en un arreglo
-        estatus_firma: 'Pendiente'
+        id_rol_esperado: { in: roles_autorizados }, 
+        estatus_firma: 'Pendiente',
+        // Filtro: Solo traer firmas de solicitudes que siguen vivas
+        solicitud: {
+          estatus_general: 'Pendiente' 
+        }
       },
       include: {
         solicitud: {
           include: {
-            activo: { select: { nombre_maquina: true } },
+            activo: { select: { id_activo: true, nombre_maquina: true } },
             solicitante: { select: { nombre_completo: true } }
           }
         }
@@ -33,10 +38,13 @@ const getFirmasPendientes = async (req, res) => {
 
     const respuesta = firmas.map(f => ({
       id_firma: f.id_firma,
-      rol_esperado_id: f.id_rol_esperado, // Útil para que el front sepa "con qué sombrero" firmas
+      rol_esperado_id: f.id_rol_esperado, 
       solicitud: {
         id_solicitud: f.solicitud.id_solicitud,
-        activo: { nombre_maquina: f.solicitud.activo?.nombre_maquina || "N/A" },
+        tipo_salida: f.solicitud.tipo_salida, 
+        comentarios: f.solicitud.comentarios, 
+        activo: { id_activo: f.solicitud.activo?.id_activo,
+        nombre_maquina: f.solicitud.activo?.nombre_maquina || "N/A" },
         solicitante: { nombre_completo: f.solicitud.solicitante?.nombre_completo || "Desconocido" }
       }
     }));
@@ -48,12 +56,13 @@ const getFirmasPendientes = async (req, res) => {
   }
 };
 
+// ruta patch /dictaminar/:id_firma
 const dictaminarFirma = async (req, res) => {
   try {
     const id_firma = parseInt(req.params.id_firma);
     const { estatus_firma, comentarios } = req.body;
     
-    const mi_id = req.usuario_token.id; // Extraemos MI ID
+    const mi_id = req.usuario_token.id;
     const mi_rol = req.usuario_token.id_rol;
 
     const firmaExistente = await prisma.aprobaciones_firma.findUnique({
@@ -64,10 +73,8 @@ const dictaminarFirma = async (req, res) => {
     if (!firmaExistente) return res.status(404).json({ error: "Firma no encontrada" });
 
     // 2. SEGURIDAD INTELIGENTE
-    // Tengo permiso si es mi rol, O SI SOY ADMIN (id_rol === 1)
     let tengoPermiso = (firmaExistente.id_rol_esperado === mi_rol || mi_rol === 1);
 
-    // Si no es mi rol natural, checo si soy suplente de alguien con ese rol
     if (!tengoPermiso) {
       const supliendoA = await prisma.usuarios.findFirst({
         where: { id_suplente: mi_id, id_rol: firmaExistente.id_rol_esperado, activo: true }
@@ -79,9 +86,7 @@ const dictaminarFirma = async (req, res) => {
       return res.status(403).json({ error: "Tu rol no tiene permiso para aplicar esta firma." });
     }
 
-    // ==========================================
-    // NUEVO CANDADO: Evitar firmar solicitudes "muertas"
-    // ==========================================
+    // CANDADO: Evitar firmar solicitudes "muertas"
     if (firmaExistente.solicitud.estatus_general === 'Cancelada' || firmaExistente.solicitud.estatus_general === 'Rechazada') {
       return res.status(400).json({ 
         error: `Operación denegada. Esta solicitud se encuentra ${firmaExistente.solicitud.estatus_general}.` 
@@ -91,39 +96,40 @@ const dictaminarFirma = async (req, res) => {
     // 3. PROCESO DE DICTAMEN (Transacción)
     const resultado = await prisma.$transaction(async (tx) => {
       
-      // A) Actualizamos la firma y REGISTRAMOS QUIÉN FIRMÓ 🕵️‍♀️
-      const firmaActualizada = await tx.aprobaciones_firma.update({
+      // A) Actualizamos la firma actual primero
+      await tx.aprobaciones_firma.update({
         where: { id_firma },
         data: { 
           estatus_firma, 
           comentarios,
           fecha_firma: new Date(),
-          id_usuario_firmo: mi_id // <-- CRÍTICO PARA AUDITORÍA
+          id_usuario_firmo: mi_id 
         }
+      });
+
+      // B) Obtenemos el panorama completo de TODAS las firmas de esta solicitud
+      const todasLasFirmas = await tx.aprobaciones_firma.findMany({
+        where: { id_solicitud: firmaExistente.id_solicitud }
       });
 
       let estatus_general = firmaExistente.solicitud.estatus_general;
 
-      // B) Lógica de Negocio: Si rechazan una, se rechaza toda la solicitud
-      if (estatus_firma === 'Rechazada') {
-        estatus_general = 'Rechazada';
-      } else {
-        // C) Si aprueban, checamos si faltan más firmas por aprobar
-        const firmasRestantes = await tx.aprobaciones_firma.count({
-          where: {
-            id_solicitud: firmaExistente.id_solicitud,
-            estatus_firma: 'Pendiente',
-            id_firma: { not: id_firma } // Excluimos la que estamos firmando ahorita
-          }
-        });
+      // C) LÓGICA DE NEGOCIO ANTIBALAS
+      const algunaRechazada = todasLasFirmas.some(f => f.estatus_firma === 'Rechazada');
+      const todasAprobadas = todasLasFirmas.every(f => f.estatus_firma === 'Aprobada');
 
-        // Si ya no hay pendientes, la solicitud completa pasa a 'Aprobada'
-        if (firmasRestantes === 0) {
-          estatus_general = 'Aprobada';
-        }
+      if (algunaRechazada) {
+        // Con 1 que rechace, se cae toda la solicitud
+        estatus_general = 'Rechazada';
+      } else if (todasAprobadas) {
+        // SOLO si el 100% de los firmantes (ej. las 2 firmas) dicen Aprobada, pasa.
+        estatus_general = 'Aprobada'; 
+      } else {
+        // Si no hay rechazadas pero tampoco todas están aprobadas, significa que alguien falta
+        estatus_general = 'Pendiente';
       }
 
-      // D) Actualizamos el estatus general de la solicitud si hubo cambios
+      // D) Actualizamos el estatus general de la solicitud
       const solicitudActualizada = await tx.solicitudes.update({
         where: { id_solicitud: firmaExistente.id_solicitud },
         data: { estatus_general }
@@ -139,6 +145,5 @@ const dictaminarFirma = async (req, res) => {
     res.status(500).json({ error: "Error al procesar el dictamen de la firma" });
   }
 };
-
 
 module.exports = { getFirmasPendientes, dictaminarFirma };

@@ -14,34 +14,18 @@ const Notificaciones = () => {
   const [loading, setLoading] = useState(true);
   const [notificaciones, setNotificaciones] = useState([]);
   
-  // Obtenemos el rol actual para saber qué filtrar (aunque el backend ya debería filtrarlo)
   const rolID = parseInt(localStorage.getItem('rol')) || 2;
 
-  // 2. DICCIONARIO DE ESTILOS (Mapea el tipo de la BD a la UI)
+  // 2. DICCIONARIO DE ESTILOS
   const getConfigVisual = (tipo) => {
     const t = tipo?.toLowerCase() || 'info';
     
     const configs = {
-      peticion: { 
-        icon: <MessageSquare className="text-blue-500" />, 
-        color: 'border-blue-100 bg-blue-50/30' 
-      },
-      urgente: { 
-        icon: <AlertTriangle className="text-orange-500" />, 
-        color: 'border-orange-100 bg-orange-50/30' 
-      },
-      vencimiento: { 
-        icon: <AlertTriangle className="text-red-500" />, 
-        color: 'border-red-100 bg-red-50/30' 
-      },
-      exito: { 
-        icon: <CheckCircle className="text-green-500" />, 
-        color: 'border-green-100 bg-green-50/30' 
-      },
-      movimiento: { 
-        icon: <History className="text-purple-500" />, 
-        color: 'border-purple-100 bg-purple-50/30' 
-      }
+      peticion: { icon: <MessageSquare className="text-blue-500" />, color: 'border-blue-100 bg-blue-50/30' },
+      urgente: { icon: <AlertTriangle className="text-orange-500" />, color: 'border-orange-100 bg-orange-50/30' },
+      vencimiento: { icon: <AlertTriangle className="text-red-500" />, color: 'border-red-100 bg-red-50/30' },
+      exito: { icon: <CheckCircle className="text-green-500" />, color: 'border-green-100 bg-green-50/30' },
+      movimiento: { icon: <History className="text-purple-500" />, color: 'border-purple-100 bg-purple-50/30' }
     };
 
     return configs[t] || { icon: <Bell className="text-gray-400" />, color: 'border-gray-100 bg-gray-50/30' };
@@ -62,7 +46,7 @@ const Notificaciones = () => {
         if (response.ok) {
           const data = await response.json();
           
-          // Transformamos lo que viene de la BD al formato que usa CardNotificacion
+          // Transformamos la data
           const formateadas = data.map(n => {
             const estilo = getConfigVisual(n.tipo);
             return {
@@ -71,7 +55,9 @@ const Notificaciones = () => {
               descripcion: n.mensaje,
               icon: estilo.icon,
               color: estilo.color,
-              fecha: n.fecha_creacion // Por si quieres mostrar la hora
+              fecha: n.fecha_creacion,
+              // ✅ Agregamos el id_solicitud que viene de la BD
+              id_solicitud: n.id_solicitud 
             };
           });
 
@@ -87,12 +73,19 @@ const Notificaciones = () => {
     fetchNotificaciones();
   }, [rolID]);
 
+  // ✅ FUNCIÓN DE NAVEGACIÓN AL HACER CLIC
+  const handleNotificacionClick = (id_solicitud) => {
+    if (id_solicitud) {
+      navigate(`/solicitud/${id_solicitud}`);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white flex flex-col font-sans pb-24">
       <Navbar />
 
       <main className="p-6 flex-1">
-        {/* Encabezado con tu estilo original */}
+        {/* Encabezado */}
         <div className="flex items-center gap-4 mb-8">
           <button 
             onClick={() => navigate(-1)} 
@@ -115,10 +108,17 @@ const Notificaciones = () => {
             </div>
           ) : notificaciones.length > 0 ? (
             notificaciones.map((notif) => (
-              <CardNotificacion key={notif.id} n={notif} />
+              // ✅ ENVOLVEMOS LA TARJETA EN UN DIV CLICKEABLE
+              <div 
+                key={notif.id}
+                onClick={() => handleNotificacionClick(notif.id_solicitud)}
+                className={notif.id_solicitud ? "cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98]" : ""}
+              >
+                <CardNotificacion n={notif} />
+              </div>
             ))
           ) : (
-            /* Estado vacío: Tu diseño de Figma */
+            /* Estado vacío */
             <div className="flex flex-col items-center justify-center mt-20 animate-in fade-in zoom-in duration-500">
               <div className="bg-gray-50 p-10 rounded-full mb-6 border-2 border-dashed border-gray-100">
                 <Bell size={64} className="text-gray-200" />

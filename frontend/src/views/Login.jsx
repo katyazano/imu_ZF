@@ -28,8 +28,8 @@ const Login = () => {
       1: '/adminDashboard',   // Administrador
       2: '/categorias',       // Usuario General
       3: '/gerenteDashboard', // Gerente
-      4: '/logisticaDashboard', // S&R (Puedes crear esta vista después)
-      5: '/ehsDashboard',     // EHS (Puedes crear esta vista después)
+      4: '/shipping-control', // ✅ Logística (Corregido)
+      5: '/ehsDashboard',         // ✅ EHS (Corregido)
       6: '/scanner',          // Seguridad
       7: '/auditorDashboard'  // Auditor
     };
@@ -108,7 +108,6 @@ const Login = () => {
         
         setShow2FA(false);
         
-        // ¡Aquí estaba el error! Ahora también usamos la función centralizada
         redirigirPorRol(role); 
       } else {
         alert(data.error || "Código de verificación incorrecto");

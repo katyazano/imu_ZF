@@ -54,7 +54,7 @@ const RutaProtegida = ({ children, rolesPermitidos }) => {
       2: '/categorias',       
       3: '/gerenteDashboard', 
       4: '/shipping-control',
-      5: '/approval',
+      5: '/ehsDashboard',
       6: '/scanner',          
       7: '/auditorDashboard'  
     };
@@ -121,7 +121,7 @@ function App() {
         {/* ========================================== */}
         {/* ⚠️ OTRAS RUTAS ESPECIALIZADAS              */}
         {/* ========================================== */}
-        <Route path="/approval" element={<RutaProtegida rolesPermitidos={[1, 5]}><RiskApproval /></RutaProtegida>} />
+        <Route path="/ehsDashboard" element={<RutaProtegida rolesPermitidos={[1, 5]}><RiskApproval /></RutaProtegida>} />
         <Route path="/shipping-control" element={<RutaProtegida rolesPermitidos={[1, 4]}><ShippingControl /></RutaProtegida>} />
 
         {/* Redirección Catch-All */}
