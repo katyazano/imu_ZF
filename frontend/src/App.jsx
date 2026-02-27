@@ -19,7 +19,7 @@ import Trazabilidad from './views/auditor/Trazabilidad';
 import RiskApproval from './views/ehs/RiskApproval';
 import ShippingControl from './views/logistics/ShippingControl';
 import Scanner from './views/security/Scanner';
-import Categorias from './views/Usuario/Categorias';
+import Categorias from './views/usuario/Categorias';
 import FormularioSolicitud from './views/Usuario/FormularioSolicitud';
 import MisSolicitudes from './views/Usuario/MisSolicitudes';
 import GerenteDashboard from "./views/Gerente/GerenteDashboard";

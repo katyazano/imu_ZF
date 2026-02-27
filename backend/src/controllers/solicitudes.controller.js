@@ -3,10 +3,9 @@ const prisma = require('../services/prisma');
 
 const crearSolicitud = async (req, res) => {
   try {
-    // 1. Extraemos el ID del usuario directamente del token (magia del middleware)
+    // 1. Extraemos el ID del usuario del token
     const id_usuario_solicitante = req.usuario_token.id; 
 
-    // 2. Extraemos los datos que nos manda React o Postman
     const { 
       id_activo, 
       tipo_salida, 
@@ -16,7 +15,7 @@ const crearSolicitud = async (req, res) => {
       metodo_transporte 
     } = req.body;
 
-    // 3. Buscamos el activo para saber a qué categoría pertenece (para leer las reglas)
+    // 2. Buscamos el activo
     const activo = await prisma.activos.findUnique({
       where: { id_activo: parseInt(id_activo) }
     });
@@ -25,82 +24,73 @@ const crearSolicitud = async (req, res) => {
       return res.status(404).json({ error: "El activo solicitado no existe." });
     }
 
-    // Opcional: Validar que el equipo no esté ya prestado o en mantenimiento
-    if (activo.id_estado_maquina !== 1) { // Suponiendo que 1 = Disponible
+    // Validamos disponibilidad (1 = Disponible)
+    if (activo.id_estado_maquina !== 1) { 
       return res.status(400).json({ error: "Este equipo no está disponible para préstamo." });
     }
 
-    // 4. Buscamos las reglas de aprobación del Admin para esta categoría
+    // 3. Buscamos las reglas de aprobación
     let regla = await prisma.reglas_aprobacion.findUnique({
       where: { id_categoria: activo.id_categoria }
     });
 
-    // 🛡️ EL PLAN B (Fallback): Si no hay regla, aplicamos la configuración por defecto
     if (!regla) {
-      console.warn(`Categoría ${activo.id_categoria} sin reglas. Usando valores por defecto.`);
-      regla = { 
-        requiere_gerente: true, // Por seguridad, siempre pedimos firma de gerente
-        requiere_syr: false, 
-        requiere_ehs: false 
-      };
+      regla = { requiere_gerente: true, requiere_syr: false, requiere_ehs: false };
     }
 
-    // 5. Construimos el "Arreglo de Firmas" basándonos en las reglas y el tipo de salida
+    // 4. Construimos el Arreglo de Firmas con IDs CORRECTOS
     const firmasRequeridas = [];
 
-    // Regla 1: ¿Requiere Gerente? (ID Rol = 3)
+    // ✅ CORRECCIÓN: Gerente es ROL 2 (El 3 es el Usuario solicitante)
     if (regla.requiere_gerente) {
-      firmasRequeridas.push({ id_rol_esperado: 3, estatus_firma: "Pendiente" });
+      firmasRequeridas.push({ id_rol_esperado: 2, estatus_firma: "Pendiente" });
     }
 
-    // Regla 2: ¿Requiere Logística S&R? (ID Rol = 4)
     if (regla.requiere_syr) {
       firmasRequeridas.push({ id_rol_esperado: 4, estatus_firma: "Pendiente" });
     }
 
-    // Regla 3: Si es Scrap o la regla manda EHS (ID Rol = 5)
     if (regla.requiere_ehs || tipo_salida.toLowerCase() === 'scrap') {
-      // Solo validamos que no lo hayamos metido ya dos veces
       const yaTieneEHS = firmasRequeridas.some(f => f.id_rol_esperado === 5);
       if (!yaTieneEHS) {
         firmasRequeridas.push({ id_rol_esperado: 5, estatus_firma: "Pendiente" });
       }
     }
 
-    // 6. Ejecutamos la "Transacción" (Todo o nada)
+    // 5. Transacción: Solicitud + Firmas + Cambio de Estado Activo
     const nuevaSolicitud = await prisma.$transaction(async (tx) => {
       
-      // A) Creamos la solicitud de viaje
       const solicitud = await tx.solicitudes.create({
         data: {
           id_activo: parseInt(id_activo),
           id_usuario_solicitante: id_usuario_solicitante,
           id_destino: id_destino ? parseInt(id_destino) : null,
           tipo_salida: tipo_salida,
-          estatus_general: "Pendiente", // Como dice tu documento
+          estatus_general: "Pendiente",
           fecha_salida_programada: new Date(fecha_salida_programada),
-          // Si es Scrap o sin retorno, la fecha de devolución puede venir vacía
           fecha_devolucion_programada: fecha_devolucion_programada ? new Date(fecha_devolucion_programada) : null,
           metodo_transporte: metodo_transporte
         }
       });
 
-      // B) Creamos todas las firmas necesarias ligadas a esta nueva solicitud
       if (firmasRequeridas.length > 0) {
         const firmasData = firmasRequeridas.map(firma => ({
           ...firma,
-          id_solicitud: solicitud.id_solicitud // Le inyectamos el ID que se acaba de crear arriba
+          id_solicitud: solicitud.id_solicitud
         }));
 
-        await tx.aprobaciones_firma.createMany({
-          data: firmasData
-        });
+        await tx.aprobaciones_firma.createMany({ data: firmasData });
       }
+
+      // Marcamos el activo como "En proceso de préstamo" (ID 4) para que nadie más lo pida
+      await tx.activos.update({
+        where: { id_activo: parseInt(id_activo) },
+        data: { id_estado_maquina: 4 } 
+      });
 
       return solicitud;
     });
 
-    // 7. Respondemos exactamente lo que el Frontend espera
     res.status(201).json({
       id_solicitud: nuevaSolicitud.id_solicitud,
       estatus_general: nuevaSolicitud.estatus_general
@@ -108,14 +98,10 @@ const crearSolicitud = async (req, res) => {
 
   } catch (error) {
     console.error("Error al crear la solicitud:", error);
-    res.status(500).json({ error: "Error interno al generar la solicitud y firmas." });
+    res.status(500).json({ error: "Error interno al generar la solicitud." });
   }
 };
 
-
-// ========================================================
-// 1. EL HISTORIAL MAESTRO (Ya con los nombres correctos)
-// ========================================================
 const getSolicitudesMaster = async (req, res) => {
   try {
     const id_rol = req.usuario_token.id_rol; 
@@ -177,7 +163,6 @@ const getSolicitudesMaster = async (req, res) => {
   }
 };
 
-
 const getMisSolicitudes = async (req, res) => {
   try {
     // Sacamos el ID del usuario directamente del token
@@ -210,7 +195,6 @@ const getMisSolicitudes = async (req, res) => {
     res.status(500).json({ error: "Error al consultar tus solicitudes" });
   }
 };
-
 
 const getSolicitudPorId = async (req, res) => {
   try {
@@ -265,7 +249,6 @@ const getSolicitudPorId = async (req, res) => {
     res.status(500).json({ error: "Error al obtener el detalle de la solicitud" });
   }
 };
-
 
 const cancelarSolicitud = async (req, res) => {
   try {

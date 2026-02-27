@@ -23,47 +23,59 @@ const Login = () => {
   // ==========================================
   // 1. PRIMER PASO: Validar usuario, password y Captcha
   // ==========================================
-  const handleInitialLogin = async (e) => {
-    e.preventDefault();
-    setErrorBackend(''); 
+const handleInitialLogin = async (e) => {
+  e.preventDefault();
+  setErrorBackend(''); 
 
-    // UX: Validación inmediata del Captcha en el Front
-    if (!captchaToken) {
-      setErrorBackend("Por favor, confirma que no eres un robot en el recuadro de abajo.");
-      return;
-    }
+  if (!captchaToken) {
+    setErrorBackend("Por favor, confirma que no eres un robot.");
+    return;
+  }
 
-    try {
-      const response = await fetch('http://localhost:4000/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-            email: email, 
-            password: password,
-            captchaToken: captchaToken // Enviamos el token real al backend
-        }) 
-      });
+  try {
+    const response = await fetch('http://localhost:4000/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+          email: email, 
+          password: password,
+          captchaToken: captchaToken 
+      }) 
+    });
 
-      const data = await response.json();
+    const data = await response.json();
 
-      if (response.ok) {
-        if (data.requires2fa) { 
-          setUserId(data.userId); 
-          setShow2FA(true); 
-        } else {
-          localStorage.setItem('token', data.token);
-          if (data.user?.id_rol) localStorage.setItem('rol', data.user.id_rol);
-          navigate('/adminDashboard');
-        }
+    if (response.ok) {
+      if (data.requires2fa) { 
+        setUserId(data.userId); 
+        setShow2FA(true); 
       } else {
-        // Importante: Si el backend rechaza el login, Google recomienda resetear el captcha
-        setErrorBackend(data.error || 'Credenciales incorrectas');
+        localStorage.setItem('token', data.token);
+        
+        const role = data.user?.id_rol ? parseInt(data.user.id_rol) : null;
+        if (role) localStorage.setItem('rol', role);
+
+        // --- MAPEO DE RUTAS ESPECÍFICO ---
+        const dashRoutes = {
+          1: '/adminDashboard',   // Administrador
+          2: '/gerenteDashboard', // Gerente
+          3: '/categorias',       // Usuario General -> Categorías
+          6: '/scanner',          // Seguridad -> Scanner
+          7: '/auditorDashboard'  // Auditor -> Dashboard Auditor
+        };
+
+        // Redirigimos según el rol o al login si algo falla
+        const destination = dashRoutes[role] || '/login';
+        navigate(destination);
       }
-    } catch (error) {
-      console.error("Error de red:", error);
-      setErrorBackend("No se pudo conectar con el servidor.");
+    } else {
+      setErrorBackend(data.error || 'Credenciales incorrectas');
     }
-  };
+  } catch (error) {
+    console.error("Error de red:", error);
+    setErrorBackend("No se pudo conectar con el servidor.");
+  }
+};
 
   // ==========================================
   // 2. SEGUNDO PASO: Validar código 2FA
