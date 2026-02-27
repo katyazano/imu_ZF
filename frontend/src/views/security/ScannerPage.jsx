@@ -13,9 +13,6 @@ const ScannerPage = () => {
   const rolActivo = parseInt(localStorage.getItem('rol')) || 2;
 
   const handleScanLogic = async (scannedId) => {
-    // 🚨 LA TRAMPA: Esto pausará la app en cuanto lea el QR
-    alert(`¡Cámara funcionó!\nCódigo leído: ${scannedId}\nTu Rol: ${rolActivo}`);
-
     // 1. Usuarios normales
     if (rolActivo !== 6) {
       if (rolActivo === 7) {
@@ -99,7 +96,7 @@ const ScannerPage = () => {
             </div>
 
             {/* 🧪 4. BOTÓN DE SIMULACIÓN (TEST) */}
-            <div className="absolute bottom-10 left-0 right-0 flex justify-center z-30 pointer-events-auto">
+            <div className="absolute bottom-28 md:bottom-10 left-0 right-0 flex justify-center z-30 pointer-events-auto">
               <button 
                 // Aquí le pasamos un ID que sepas que existe en tu BD (ej. '1')
                 onClick={() => handleScanLogic('1')}

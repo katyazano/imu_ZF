@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Settings, ChevronRight, ClipboardList, 
-  Eye, Clock, CheckCircle, UserPlus, XCircle, Package, History
+  Eye, Clock, CheckCircle, UserPlus, XCircle, Package, History, LogOut
 } from 'lucide-react';
 import Navbar from '../components/Navbar';
 
@@ -29,7 +29,6 @@ const Perfil = () => {
   useEffect(() => {
     // Recuperamos el rol y el nombre guardados en el login
     const savedRole = parseInt(localStorage.getItem('rol')) || 3;
-    // Podrías guardar el nombre en el login también: localStorage.setItem('nombre', data.user.nombre_completo)
     const savedName = localStorage.getItem('nombre') || "Kathe"; 
 
     setRolID(savedRole);
@@ -43,7 +42,16 @@ const Perfil = () => {
     foto: `https://api.dicebear.com/7.x/avataaars/svg?seed=${nombreUsuario}`
   };
 
-  // --- TU LÓGICA DE HISTORIAL (Ahora ligada a los IDs) ---
+  // --- FUNCIÓN PARA CERRAR SESIÓN ---
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('rol');
+    localStorage.removeItem('nombre');
+    // Reemplazamos la historia para que el usuario no pueda volver atrás con el navegador
+    navigate('/', { replace: true }); 
+  };
+
+  // --- TU LÓGICA DE HISTORIAL ---
   const historialPorRol = {
     'admin': [
       { text: "Diste acceso a Juan Pérez para aceptar solicitudes", date: "Hoy, 10:00 AM" },
@@ -73,7 +81,7 @@ const Perfil = () => {
     ]
   };
 
-  // --- DATOS DE PRÉSTAMOS (Mantenemos por ahora, pero lo ideal es un fetch) ---
+  // --- DATOS DE PRÉSTAMOS ---
   const misPrestamos = [
     { nombre: "BetaWorks Serie X20", id: "1", status: "Aceptado", color: "text-green-600 bg-green-50" },
     { nombre: "GammaTech B1", id: "5", status: "Pendiente", color: "text-orange-600 bg-orange-50" }
@@ -102,7 +110,7 @@ const Perfil = () => {
           </p>
 
           <div className="w-full mt-10 space-y-4">
-            {/* Actividad Reciente (Para todos los roles) */}
+            {/* Actividad Reciente */}
             <button 
               onClick={() => setShowModal('historial')}
               className="w-full bg-gray-50 p-5 rounded-2xl flex items-center justify-between active:scale-[0.98] transition-all group"
@@ -116,7 +124,7 @@ const Perfil = () => {
               <ChevronRight size={20} className="text-gray-300" />
             </button>
 
-            {/* Mis Préstamos (Solo para Usuario General o Admin) */}
+            {/* Mis Préstamos */}
             {(rolID === 3 || rolID === 1) && (
               <button 
                 onClick={() => setShowModal('prestamos')}
@@ -130,6 +138,7 @@ const Perfil = () => {
               </button>
             )}
 
+            {/* Configuración */}
             <button className="w-full bg-white border-2 border-gray-100 p-5 rounded-2xl flex items-center justify-between opacity-50 cursor-not-allowed">
               <div className="flex items-center gap-4">
                 <div className="p-2 bg-gray-50 rounded-xl text-gray-400">
@@ -139,9 +148,25 @@ const Perfil = () => {
                   Configuración
                 </span>
               </div>
-              {/* Agregamos el icono que faltaba para mantener el diseño */}
               <ChevronRight size={20} className="text-gray-200" />
             </button>
+
+            {/* BOTÓN DE CERRAR SESIÓN */}
+            <button 
+              onClick={handleLogout}
+              className="w-full bg-red-50/50 border-2 border-red-50 p-5 rounded-2xl flex items-center justify-between active:scale-[0.98] transition-all mt-6"
+            >
+              <div className="flex items-center gap-4">
+                <div className="p-2 bg-white rounded-xl text-red-500 shadow-sm">
+                  <LogOut size={22} />
+                </div>
+                <span className="font-bold text-red-600 uppercase text-xs tracking-wider">
+                  Cerrar Sesión
+                </span>
+              </div>
+              <ChevronRight size={20} className="text-red-200" />
+            </button>
+
           </div>
         </div>
       </main>
