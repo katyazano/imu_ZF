@@ -41,9 +41,8 @@ const crearSolicitud = async (req, res) => {
     // 4. Construimos el Arreglo de Firmas con IDs CORRECTOS
     const firmasRequeridas = [];
 
-    // ✅ CORRECCIÓN: Gerente es ROL 2 (El 3 es el Usuario solicitante)
     if (regla.requiere_gerente) {
-      firmasRequeridas.push({ id_rol_esperado: 2, estatus_firma: "Pendiente" });
+      firmasRequeridas.push({ id_rol_esperado: 3, estatus_firma: "Pendiente" });
     }
 
     if (regla.requiere_syr) {

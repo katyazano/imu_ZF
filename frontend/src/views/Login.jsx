@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Lock } from 'lucide-react';
-import ReCAPTCHA from "react-google-recaptcha"; // Importamos la librería real
+import ReCAPTCHA from "react-google-recaptcha";
 import zfLogo from '../assets/zf-logo.png';
 import Modal2FA from '../components/Modal2FA';
 
@@ -21,61 +21,69 @@ const Login = () => {
   const [errorBackend, setErrorBackend] = useState(''); 
 
   // ==========================================
+  // LÓGICA CENTRALIZADA DE RUTEO
+  // ==========================================
+  const redirigirPorRol = (roleId) => {
+    const dashRoutes = {
+      1: '/adminDashboard',   // Administrador
+      2: '/categorias',       // Usuario General
+      3: '/gerenteDashboard', // Gerente
+      4: '/logisticaDashboard', // S&R (Puedes crear esta vista después)
+      5: '/ehsDashboard',     // EHS (Puedes crear esta vista después)
+      6: '/scanner',          // Seguridad
+      7: '/auditorDashboard'  // Auditor
+    };
+
+    const destination = dashRoutes[roleId] || '/login';
+    navigate(destination);
+  };
+
+  // ==========================================
   // 1. PRIMER PASO: Validar usuario, password y Captcha
   // ==========================================
-const handleInitialLogin = async (e) => {
-  e.preventDefault();
-  setErrorBackend(''); 
+  const handleInitialLogin = async (e) => {
+    e.preventDefault();
+    setErrorBackend(''); 
 
-  if (!captchaToken) {
-    setErrorBackend("Por favor, confirma que no eres un robot.");
-    return;
-  }
-
-  try {
-    const response = await fetch('http://localhost:4000/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-          email: email, 
-          password: password,
-          captchaToken: captchaToken 
-      }) 
-    });
-
-    const data = await response.json();
-
-    if (response.ok) {
-      if (data.requires2fa) { 
-        setUserId(data.userId); 
-        setShow2FA(true); 
-      } else {
-        localStorage.setItem('token', data.token);
-        
-        const role = data.user?.id_rol ? parseInt(data.user.id_rol) : null;
-        if (role) localStorage.setItem('rol', role);
-
-        // --- MAPEO DE RUTAS ESPECÍFICO ---
-        const dashRoutes = {
-          1: '/adminDashboard',   // Administrador
-          2: '/gerenteDashboard', // Gerente
-          3: '/categorias',       // Usuario General -> Categorías
-          6: '/scanner',          // Seguridad -> Scanner
-          7: '/auditorDashboard'  // Auditor -> Dashboard Auditor
-        };
-
-        // Redirigimos según el rol o al login si algo falla
-        const destination = dashRoutes[role] || '/login';
-        navigate(destination);
-      }
-    } else {
-      setErrorBackend(data.error || 'Credenciales incorrectas');
+    if (!captchaToken) {
+      setErrorBackend("Por favor, confirma que no eres un robot.");
+      return;
     }
-  } catch (error) {
-    console.error("Error de red:", error);
-    setErrorBackend("No se pudo conectar con el servidor.");
-  }
-};
+
+    try {
+      const response = await fetch('http://localhost:4000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            email: email, 
+            password: password,
+            captchaToken: captchaToken 
+        }) 
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        if (data.requires2fa) { 
+          setUserId(data.userId); 
+          setShow2FA(true); 
+        } else {
+          localStorage.setItem('token', data.token);
+          
+          const role = data.user?.id_rol ? parseInt(data.user.id_rol) : null;
+          if (role) localStorage.setItem('rol', role);
+
+          // Usamos la función centralizada
+          redirigirPorRol(role);
+        }
+      } else {
+        setErrorBackend(data.error || 'Credenciales incorrectas');
+      }
+    } catch (error) {
+      console.error("Error de red:", error);
+      setErrorBackend("No se pudo conectar con el servidor.");
+    }
+  };
 
   // ==========================================
   // 2. SEGUNDO PASO: Validar código 2FA
@@ -92,9 +100,14 @@ const handleInitialLogin = async (e) => {
 
       if (response.ok) {
         localStorage.setItem('token', data.token);
-        if (data.user?.id_rol) localStorage.setItem('rol', data.user.id_rol);
+        
+        const role = data.user?.id_rol ? parseInt(data.user.id_rol) : null;
+        if (role) localStorage.setItem('rol', role);
+        
         setShow2FA(false);
-        navigate('/adminDashboard'); 
+        
+        // ¡Aquí estaba el error! Ahora también usamos la función centralizada
+        redirigirPorRol(role); 
       } else {
         alert(data.error || "Código de verificación incorrecto");
       }
@@ -152,10 +165,10 @@ const handleInitialLogin = async (e) => {
               <Lock className="text-gray-600 w-6 h-6 ml-2" />
             </div>
 
-            {/* --- COMPONENTE GOOGLE RECAPTCHA REAL --- */}
+            {/* --- COMPONENTE GOOGLE RECAPTCHA --- */}
             <div className="flex justify-center scale-90 -mx-10 transform origin-center">
               <ReCAPTCHA
-                sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI" // Esta es una Site Key de prueba de Google
+                sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI" 
                 onChange={(token) => setCaptchaToken(token)}
                 onExpired={() => setCaptchaToken(null)}
               />

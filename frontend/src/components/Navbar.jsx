@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom'; 
-import { Menu, X, Bell, User, Search, Camera, Home, LogOut } from 'lucide-react';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
+import { Menu, X, Bell, User, Search, Camera, LogOut } from 'lucide-react';
 import zfLogo from '../assets/zf-logo.png';
 
 const Navbar = () => {
+  const location = useLocation();
   const navigate = useNavigate();
-  const [isOpen, setIsOpen] = useState(false);
+  
+  // ESTADOS
+  const [isOpen, setIsOpen] = useState(false); // Para el menú móvil
+  const [busqueda, setBusqueda] = useState(''); // Para el texto del buscador
 
-  // 1. OBTENCIÓN DEL ROL DESDE EL LOGIN
-  const rolActivo = parseInt(localStorage.getItem('rol')) || 3; 
+  // 1. OBTENCIÓN DEL ROL
+  const rolActivo = parseInt(localStorage.getItem('rol')) || 2; 
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -17,13 +21,43 @@ const Navbar = () => {
     navigate('/', { replace: true }); 
   };
 
-  // 2. RUTEO DINÁMICO DEL HOME
+  // 2. 🧠 CONFIGURACIÓN CONTEXTUAL DEL BUSCADOR
+  const getSearchConfig = () => {
+    const path = location.pathname;
+
+    // Si estamos en secciones de SOLICITUDES
+    if (path.includes('/mis-solicitudes') || path.includes('/solicitud/')) {
+      return {
+        placeholder: "Buscar folio o equipo...",
+        targetPath: "/mis-solicitudes"
+      };
+    }
+
+    // Por defecto (Activos, Categorías, Home)
+    return {
+      placeholder: rolActivo === 7 ? "Rastrear trazabilidad..." : "Buscar activos o IDs...",
+      targetPath: "/activos"
+    };
+  };
+
+  const searchConfig = getSearchConfig();
+
+  const handleSearch = (e) => {
+    if (e.key === 'Enter' && busqueda.trim() !== '') {
+      // Navegamos a la ruta objetivo con el parámetro de búsqueda ?q=
+      navigate(`${searchConfig.targetPath}?q=${busqueda}`);
+      setBusqueda(''); // Limpiamos el input
+      setIsOpen(false);
+    }
+  };
+
+  // 3. RUTEO DINÁMICO DEL HOME
   const getHomePath = () => {
     switch (rolActivo) {
       case 1: return '/adminDashboard';
-      case 2: return '/gerenteDashboard';
-      case 3: return '/categorias'; // Usuario General -> Categorías
-      case 6: return '/scanner';    // Seguridad -> Directo al Scanner
+      case 2: return '/categorias'; // Usuario General -> Categorías
+      case 3: return '/gerenteDashboard';
+      case 6: return '/scanner';
       case 7: return '/auditorDashboard';
       default: return '/categorias';
     }
@@ -35,30 +69,34 @@ const Navbar = () => {
     navigate(getHomePath());
   };
 
-  // 3. ENLACES DINÁMICOS POR ROL
+  // 4. ENLACES DINÁMICOS POR ROL
   const getNavLinks = () => {
     switch (rolActivo) {
-      case 1: 
+      case 1:
         return [
           { name: 'Activos', path: '/activos' },
           { name: 'Prestamos', path: '/prestamos-activos' }
         ];
-      case 2: 
+      case 3:
         return [
           { name: 'Activos', path: '/activos' },
           { name: 'Validar Peticiones', path: '/validar-solicitudes' }
         ];
-      case 3: 
+      case 2:
         return [
-          { name: 'Categorías', path: '/categorias' },
           { name: 'Mis Solicitudes', path: '/mis-solicitudes' }
         ];
-      case 7: 
+      case 7:
         return [{ name: 'Inventario', path: '/activos' }];
-      case 6: // Seguridad
-        return []; // Solo tiene el Scanner como Home, no necesita más links
-      default: 
-        return [];
+      default: return [];
+    }
+  };
+
+  const getHomeLabel = () => {
+    switch(rolActivo) {
+      case 6: return 'Scanner';
+      case 2: return 'Catálogo';
+      default: return 'Inicio';
     }
   };
 
@@ -67,36 +105,31 @@ const Navbar = () => {
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
         
         <div className="flex items-center gap-4">
-          {/* Menú hamburguesa solo si hay links que mostrar */}
-          {getNavLinks().length > 0 && (
-            <button onClick={() => setIsOpen(true)} className="md:hidden p-1 active:scale-90 transition-transform">
-              <Menu size={32} />
-            </button>
-          )}
-          <button onClick={handleHomeClick}>
+          <button onClick={() => setIsOpen(true)} className="md:hidden p-1 active:scale-90 transition-transform">
+            <Menu size={32} />
+          </button>
+          <button onClick={handleHomeClick} className="active:scale-95 transition-transform">
             <img src={zfLogo} alt="ZF" className="h-8 hidden md:block brightness-0 invert" />
           </button>
         </div>
 
-        {/* 🔍 BUSCADOR: Oculto para Seguridad (Rol 6) para evitar distracciones */}
+        {/* 🔍 BUSCADOR CONTEXTUAL */}
         {rolActivo !== 6 && (
           <div className="flex-1 max-w-md mx-4">
-            <div className="bg-white rounded-lg flex items-center px-3 py-1.5 text-gray-500 shadow-inner">
-              <Search size={18} className="mr-2" />
+            <div className="bg-white rounded-xl flex items-center px-3 py-1.5 text-gray-500 shadow-inner">
+              <Search size={18} className="mr-2 text-gray-400" />
               <input 
                 type="text" 
-                className="w-full bg-transparent outline-none text-black text-sm" 
-                placeholder={rolActivo === 7 ? "Rastrear trazabilidad..." : "Buscar activos..."} 
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && e.target.value) {
-                      navigate(rolActivo === 7 ? `/auditor/trazabilidad/${e.target.value}` : `/activos?q=${e.target.value}`);
-                  }
-                }}
+                className="w-full bg-transparent outline-none text-black text-sm font-medium" 
+                placeholder={searchConfig.placeholder} // <-- Placeholder dinámico
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                onKeyDown={handleSearch} // <-- Comportamiento dinámico
               />
-              <div className="w-px h-5 bg-gray-300 mx-2"></div>
+              <div className="w-px h-5 bg-gray-200 mx-2"></div>
               <button 
                 onClick={() => navigate('/scanner')}
-                className="flex items-center gap-1 p-1 hover:bg-gray-100 rounded-md transition-colors text-[#0070BC]"
+                className="flex items-center gap-1 p-1 hover:bg-gray-100 rounded-lg transition-colors text-[#0070BC]"
               >
                 <Camera size={20} />
               </button>
@@ -104,31 +137,30 @@ const Navbar = () => {
           </div>
         )}
 
-        {/* 📋 LINKS Y ACCIONES FINALES */}
-        <div className="flex items-center gap-6 font-medium">
+        {/* 📋 LINKS ESCRITORIO */}
+        <div className="flex items-center gap-6">
           <div className="hidden md:flex items-center gap-6">
-            <button onClick={handleHomeClick} className="hover:text-blue-200 transition-colors uppercase tracking-widest text-[10px]">
-              {rolActivo === 6 ? 'Scanner' : 'Home'}
+            <button onClick={handleHomeClick} className="hover:text-blue-200 transition-colors uppercase tracking-widest text-[10px] font-black italic">
+              {getHomeLabel()}
             </button>
             
             {getNavLinks().map((link) => (
-              <Link key={link.name} to={link.path} className="hover:text-blue-200 transition-colors uppercase tracking-widest text-[10px]">
+              <Link key={link.name} to={link.path} className="hover:text-blue-200 transition-colors uppercase tracking-widest text-[10px] font-black italic">
                 {link.name}
               </Link>
             ))}
           </div>
 
           <div className="flex gap-4 items-center">
-            {/* Ocultamos notificaciones para el guardia */}
             {rolActivo !== 6 && (
-              <Link to="/notificaciones">
-                <Bell size={22} className="cursor-pointer hover:text-blue-200 transition-colors" />
+              <Link to="/notificaciones" className="hover:scale-110 transition-transform">
+                <Bell size={22} />
               </Link>
             )}
-            <Link to="/perfil">
-              <User size={22} className="cursor-pointer hover:text-blue-200 transition-colors" />
+            <Link to="/perfil" className="hover:scale-110 transition-transform">
+              <User size={22} />
             </Link>
-            <button onClick={handleLogout} className="text-red-300 hover:text-red-400 transition-colors" title="Cerrar sesión">
+            <button onClick={handleLogout} className="text-red-300 hover:text-red-100 transition-colors">
               <LogOut size={22} />
             </button>
           </div>
@@ -138,17 +170,23 @@ const Navbar = () => {
       {/* --- DRAWER MÓVIL --- */}
       {isOpen && (
         <div className="fixed inset-0 z-[100] md:hidden">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setIsOpen(false)}></div>
-          <div className="relative w-[80%] max-w-sm h-full bg-[#0070BC] p-8 flex flex-col shadow-2xl">
-            <button onClick={() => setIsOpen(false)} className="self-end text-white/70 p-2"><X size={24} /></button>
-            <div className="flex flex-col gap-4 mt-8">
-              <button onClick={handleHomeClick} className="text-white font-bold text-left px-4 py-3 hover:bg-white/10 rounded-xl">Inicio</button>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsOpen(false)}></div>
+          <div className="relative w-[80%] max-w-sm h-full bg-[#0070BC] p-8 flex flex-col shadow-2xl animate-in slide-in-from-left duration-300">
+            <button onClick={() => setIsOpen(false)} className="self-end text-white/70 p-2"><X size={32} /></button>
+            <div className="flex flex-col gap-6 mt-12">
+              <button onClick={handleHomeClick} className="text-white text-2xl font-black uppercase italic text-left px-4">
+                {getHomeLabel()}
+              </button>
               {getNavLinks().map((link) => (
-                <Link key={link.name} to={link.path} className="text-white font-bold text-left px-4 py-3 hover:bg-white/10 rounded-xl" onClick={() => setIsOpen(false)}>
+                <Link key={link.name} to={link.path} className="text-white/80 text-xl font-bold uppercase tracking-tight text-left px-4 hover:text-white" onClick={() => setIsOpen(false)}>
                   {link.name}
                 </Link>
               ))}
-              <button onClick={handleLogout} className="mt-8 bg-red-500 text-white font-bold py-3 rounded-xl">Cerrar Sesión</button>
+              <div className="mt-auto">
+                <button onClick={handleLogout} className="w-full bg-red-500/20 border-2 border-red-500/50 text-red-100 font-black py-4 rounded-2xl uppercase tracking-widest text-xs">
+                  Cerrar Sesión
+                </button>
+              </div>
             </div>
           </div>
         </div>

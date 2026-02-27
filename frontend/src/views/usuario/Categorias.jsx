@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  ArrowLeft, Settings, Monitor, FlaskConical, 
+  Settings, Monitor, FlaskConical, 
   Wrench, Car, Terminal, Smartphone, Ruler 
 } from 'lucide-react';
 import Navbar from '../../components/Navbar';
@@ -25,9 +25,6 @@ const Categorias = () => {
       <Navbar />
 
       <header className="px-6 mt-8">
-        <button onClick={() => navigate(-1)} className="flex items-center text-[#0070BC] font-bold mb-4">
-          <ArrowLeft size={20} className="mr-1" /> Volver
-        </button>
         <div className="text-center">
           <h1 className="text-4xl font-black text-gray-900 leading-none uppercase italic">Categorías</h1>
           <div className="w-16 h-1.5 bg-[#0070BC] mx-auto mt-2"></div>
@@ -39,7 +36,8 @@ const Categorias = () => {
           {categorias.map((cat) => (
             <button
               key={cat.id}
-              onClick={() => navigate(cat.path)}
+              // En tu mapeo de categorías dentro de Categorias.jsx:
+              onClick={() => navigate('/activos', { state: { catId: cat.id, catNombre: cat.nombre } })}
               className="flex flex-col items-center justify-center p-6 border-2 border-gray-100 rounded-[30px] bg-white shadow-sm hover:border-[#0070BC] hover:shadow-md transition-all active:scale-95"
             >
               <div className="text-gray-400 mb-3 p-3 bg-gray-50 rounded-2xl group-hover:text-[#0070BC]">
