@@ -51,7 +51,8 @@ const Login = () => {
     }
 
     try {
-      const response = await fetch('http://localhost:4000/api/auth/login', {
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+      const response = await fetch(`${baseUrl}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -90,7 +91,8 @@ const Login = () => {
   // ==========================================
   const handleFinalVerify = async (codigoIngresado) => {
     try {
-      const response = await fetch('http://localhost:4000/api/auth/verify-2fa', {
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+      const response = await fetch(`${baseUrl}/auth/verify-2fa`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: userId, codigo2FA: codigoIngresado })

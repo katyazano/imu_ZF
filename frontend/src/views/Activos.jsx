@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom'; // Agregamos useSearchParams
-import { Filter, Plus, ArrowLeft, Loader2 } from 'lucide-react';
+import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { Plus, ArrowLeft, Loader2 } from 'lucide-react';
 import Navbar from '../components/Navbar';
 
 const Activos = () => {
@@ -8,7 +8,6 @@ const Activos = () => {
   const location = useLocation();
   
   // 1. 🔍 LEER BÚSQUEDA DESDE LA URL
-  // Esto permite que lo que escribas en el Navbar se filtre aquí automáticamente
   const [searchParams] = useSearchParams();
   const queryBusqueda = searchParams.get('q') || ''; 
 
@@ -21,7 +20,7 @@ const Activos = () => {
 
   const rolActivo = parseInt(localStorage.getItem('rol')) || 2; 
 
-  // Estado para los filtros de burbuja (Disponible, Mantenimiento, etc.)
+  // Estado para los filtros de burbuja
   const [filtroEstado, setFiltroEstado] = useState('Todos');
   const categoriasTabs = ['Todos', 'Mantenimiento', 'Disponible', 'Prestado'];
 
@@ -30,12 +29,18 @@ const Activos = () => {
       try {
         setLoading(true);
         const token = localStorage.getItem('token');
-        const baseUrl = import.meta.env.VITE_API_URL;
+        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
 
-        // Usamos id_categoria para que coincida con tu backend
-        const url = catId 
-          ? `${baseUrl}/activos?id_categoria=${catId}` 
-          : `${baseUrl}/activos`;
+        // Construcción inteligente de la URL
+        let url = `${baseUrl}/activos`;
+        const queryParms = new URLSearchParams();
+
+        if (catId) queryParms.append('id_categoria', catId);
+        // Si es Gerente (3), pedimos solo sus activos
+        if (rolActivo === 3) queryParms.append('mis_activos', 'true');
+
+        const queryString = queryParms.toString();
+        if (queryString) url += `?${queryString}`;
 
         const response = await fetch(url, {
           headers: { 'Authorization': `Bearer ${token}` }
@@ -48,9 +53,9 @@ const Activos = () => {
         const activosMapeados = data.map(item => ({
           id: item.id_activo.toString(),
           nombre: item.nombre_maquina,
-          estado: item.estado_maquina?.nombre || 'Desconocido',
+          estado: item.estado_maquina?.nombre_estado || 'Desconocido', // Corregido: nombre_estado según BD
           color: getEstadoColor(item.id_estado_maquina),
-          tipo: item.disciplina?.nombre || 'General'
+          tipo: item.disciplina?.nombre_disciplina || 'General' // Corregido: nombre_disciplina según BD
         }));
 
         setActivos(activosMapeados);
@@ -62,7 +67,7 @@ const Activos = () => {
     };
 
     fetchActivos();
-  }, [catId]);
+  }, [catId, rolActivo]); // Agregado rolActivo a las dependencias
 
   const getEstadoColor = (idEstado) => {
     switch (idEstado) {
@@ -74,7 +79,6 @@ const Activos = () => {
   };
 
   // 2. 🧠 FILTRADO INTELIGENTE
-  // Filtra por las burbujas (Estado) Y por lo que venga del Navbar (queryBusqueda)
   const activosFiltrados = useMemo(() => {
     return activos.filter((activo) => {
       const coincideEstado = filtroEstado === 'Todos' || activo.estado === filtroEstado;
@@ -90,19 +94,21 @@ const Activos = () => {
       <Navbar />
 
       <header className="px-6 mt-10">
+        {/* ✅ ERROR DE SINTAXIS CORREGIDO AQUÍ ✅ */}
         <div className="flex items-center justify-between mb-6">
           <button onClick={() => navigate(-1)} className="p-2 bg-gray-50 rounded-full text-[#0070BC] active:scale-90 transition-transform">
             <ArrowLeft size={20} />
           </button>
           
           <div className="flex gap-2">
-             {rolActivo === 1 && (
-               <button onClick={() => navigate('/nuevo-activo')} className="p-3 bg-[#0070BC] rounded-2xl text-white shadow-lg active:scale-90 transition-transform">
-                 <Plus size={20} strokeWidth={3} />
-               </button>
-             )}
+            {rolActivo === 1 && (
+              <button onClick={() => navigate('/nuevo-activo')} className="p-3 bg-[#0070BC] rounded-2xl text-white shadow-lg active:scale-90 transition-transform">
+                <Plus size={20} strokeWidth={3} />
+              </button>
+            )}
           </div>
         </div>
+        {/* ==================================== */}
 
         <h1 className="text-4xl font-black text-gray-900 uppercase italic tracking-tighter leading-tight">
           {catNombre || 'Inventario'} <br /> 
@@ -132,13 +138,23 @@ const Activos = () => {
             <Loader2 className="animate-spin mb-4 text-[#0070BC]" size={40} />
             <p className="font-black uppercase tracking-[0.2em] text-[10px]">Actualizando ZF Assets...</p>
           </div>
+        ) : error ? (
+           <div className="text-center mt-20 text-red-500 font-bold">{error}</div>
         ) : (
           <div className="grid grid-cols-1 gap-4">
             {activosFiltrados.length > 0 ? (
               activosFiltrados.map((activo) => (
                 <Link 
                   key={activo.id} 
-                  to={rolActivo === 7 ? `/auditor/trazabilidad/${activo.id}` : `/activo/${activo.id}`}
+                  // ✅ Lógica de redirección dinámica según el rol
+                  to={
+                    // 1. Si es Auditor (7), va a su ruta de trazabilidad específica
+                    rolActivo === 7 ? `/auditor/trazabilidad/${activo.id}` : 
+                    // 2. Si es Gerente (3), lo mandamos a la ruta que acabamos de ver en tu App.js
+                    rolActivo === 3 ? `/historial-activo/${activo.id}` : 
+                    // 3. Para cualquier otro rol (Usuario General, Admin, etc.), el detalle normal
+                    `/activo/${activo.id}`
+                  }
                   className="bg-white border-2 border-gray-50 rounded-[30px] p-5 shadow-sm active:scale-[0.98] transition-all group hover:border-blue-100"
                 >
                   <div className="flex justify-between items-start">

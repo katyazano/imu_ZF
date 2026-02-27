@@ -1,14 +1,19 @@
 const prisma = require('../services/prisma');
 const crypto = require('crypto');
 
-// 1. OBTENER TODOS LOS ACTIVOS (Con filtros)
+// 1. OBTENER TODOS LOS ACTIVOS (Con filtros inteligentes)
 const getActivos = async (req, res) => {
   try {
-    const { id_categoria, id_estado_maquina } = req.query;
-    
+    const { id_categoria, id_estado_maquina, mis_activos } = req.query;
     const whereClause = {};
+
     if (id_categoria) whereClause.id_categoria = parseInt(id_categoria);
     if (id_estado_maquina) whereClause.id_estado_maquina = parseInt(id_estado_maquina);
+
+    // 🔒 LA MAGIA: Si el front pide "mis activos", filtramos por el ID del token
+    if (mis_activos === 'true' && req.usuario_token) {
+      whereClause.id_gerente = req.usuario_token.id; 
+    }
 
     const listaActivos = await prisma.activos.findMany({
       where: whereClause,

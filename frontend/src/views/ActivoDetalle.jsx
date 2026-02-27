@@ -7,7 +7,7 @@ import {
 import { QRCodeSVG } from 'qrcode.react'; 
 import Navbar from '../components/Navbar';
 
-const baseUrl = import.meta.env.VITE_API_URL;
+const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
 
 const ActivoDetalle = () => {
   const navigate = useNavigate();
@@ -59,7 +59,7 @@ const ActivoDetalle = () => {
 
   // --- ESTADOS DE CARGA Y ERROR ---
   if (loading) return (
-    <div className="min-h-screen bg-white flex flex-col items-center justify-center">
+    <div className="min-h-screen bg-white flex flex-col items-center justify-center font-sans">
       <Navbar />
       <div className="flex-1 flex flex-col items-center justify-center">
         <Loader2 className="animate-spin text-[#0070BC] mb-4" size={48} />
@@ -87,7 +87,7 @@ const ActivoDetalle = () => {
   );
 
   return (
-    <div className="min-h-screen bg-white flex flex-col font-sans pb-32">
+    <div className="min-h-screen bg-white flex flex-col font-sans pb-[150px] md:pb-32">
       <Navbar />
       
       {/* HEADER DINÁMICO */}
@@ -130,14 +130,15 @@ const ActivoDetalle = () => {
             {activo.nombre_maquina}
           </h1>
           
-          <div className={`px-6 py-2 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-sm
+          {/* ✅ CORRECCIÓN 1: nombre_estado */}
+          <div className={`px-6 py-2 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-sm mb-8
             ${activo.id_estado_maquina === 1 ? 'bg-[#28B4AD] text-white shadow-teal-200' : 'bg-orange-500 text-white shadow-orange-200'}`}>
-            {activo.estado_maquina?.nombre || 'Estado desconocido'}
+            {activo.estado_maquina?.nombre_estado || 'Estado desconocido'}
           </div>
         </div>
 
         {/* ESPECIFICACIONES TÉCNICAS */}
-        <div className="bg-gray-50 rounded-[35px] p-8 mt-10 border border-gray-100">
+        <div className="bg-gray-50 rounded-[35px] p-8 border border-gray-100">
           <h3 className="text-gray-400 font-black mb-6 uppercase text-[10px] tracking-[0.2em] flex items-center gap-2">
             <PackageOpen size={16} /> Detalles Técnicos
           </h3>
@@ -147,8 +148,9 @@ const ActivoDetalle = () => {
                 <p className="font-bold text-gray-800 leading-tight">{activo.modelo || 'N/A'}</p>
             </div>
             <div>
+                {/* ✅ CORRECCIÓN 2: nombre_disciplina */}
                 <p className="font-black text-[#0070BC] uppercase text-[9px] tracking-widest mb-1">Categoría</p>
-                <p className="font-bold text-gray-800 leading-tight">{activo.disciplina?.nombre || 'General'}</p>
+                <p className="font-bold text-gray-800 leading-tight">{activo.disciplina?.nombre_disciplina || 'General'}</p>
             </div>
             <div>
                 <p className="font-black text-[#0070BC] uppercase text-[9px] tracking-widest mb-1">No. Serie</p>
@@ -163,7 +165,8 @@ const ActivoDetalle = () => {
       </main>
 
       {/* --- ACTION BAR INFERIOR FIJA --- */}
-      <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-white via-white to-transparent pb-10">
+      {/* ✅ CORRECCIÓN 3: bottom-[72px] md:bottom-0 para que no choque con la Navbar en celular */}
+      <div className="fixed bottom-[72px] md:bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-white via-white/90 to-transparent pb-6 md:pb-10 z-40">
         <div className="max-w-md mx-auto flex gap-4">
           {userRole === 1 ? (
              <>
