@@ -24,8 +24,10 @@ const MisSolicitudes = () => {
         });
         
         if (!response.ok) throw new Error('Error al obtener el historial');
-        const data = await response.json();
-        setSolicitudes(data);
+        const rawData = await response.json();
+        // Si el backend manda { data: [...] }, sacamos el arreglo. Si manda [...] directo, lo usamos tal cual.
+        const datosFinales = rawData.data ? rawData.data : rawData; 
+        setSolicitudes(datosFinales);
       } catch (error) {
         console.error("Error:", error);
       } finally {

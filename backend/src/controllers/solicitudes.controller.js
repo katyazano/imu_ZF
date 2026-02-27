@@ -168,8 +168,12 @@ const getSolicitudesMaster = async (req, res) => {
 
 const getMisSolicitudes = async (req, res) => {
   try {
-    // Sacamos el ID del usuario directamente del token
-    const id_usuario = req.usuario_token.id;
+    // CORRECCIÓN 1: Forzar a que sea un Int. Prisma odia los strings en campos numéricos.
+    const id_usuario = parseInt(req.usuario_token.id, 10);
+
+    if (isNaN(id_usuario)) {
+      return res.status(400).json({ error: "ID de usuario inválido en el token" });
+    }
 
     // Buscamos SOLO las solicitudes de este usuario
     const misSolicitudes = await prisma.solicitudes.findMany({
@@ -182,7 +186,7 @@ const getMisSolicitudes = async (req, res) => {
       }
     });
 
-    // Mapeamos al formato exacto de tu documento
+    // Mapeamos al formato exacto
     const respuestaFormateada = misSolicitudes.map(sol => ({
       id_solicitud: sol.id_solicitud,
       estatus_general: sol.estatus_general,
@@ -192,7 +196,10 @@ const getMisSolicitudes = async (req, res) => {
       }
     }));
 
-    res.status(200).json(respuestaFormateada);
+    // CORRECCIÓN 2: Envolvemos en un objeto con la propiedad "data".
+    // Esto es el estándar de la industria y evita que los map() de React crasheen.
+    res.status(200).json({ data: respuestaFormateada });
+    
   } catch (error) {
     console.error("Error en getMisSolicitudes:", error);
     res.status(500).json({ error: "Error al consultar tus solicitudes" });
