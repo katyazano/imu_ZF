@@ -13,17 +13,19 @@ const ScannerPage = () => {
   const rolActivo = parseInt(localStorage.getItem('rol')) || 2;
 
   const handleScanLogic = async (scannedId) => {
-    // 1. Usuarios normales
+    // 1. Usuarios normales, Gerentes y Auditores
     if (rolActivo !== 6) {
-      if (rolActivo === 7) {
+      // Si es Auditor (7) o Gerente (3), van al expediente completo
+      if (rolActivo === 7 || rolActivo === 3) {
         navigate(`/auditor/trazabilidad/${scannedId}`);
       } else {
+        // Cualquier otro rol (Usuario General, Admin, etc.) va al detalle normal
         navigate(`/activo/${scannedId}`);
       }
       return;
     }
 
-    // 2. Seguridad
+    // 2. Seguridad (Rol 6) - Ejecuta la verificación de salida
     await verificarPaseSeguridad(scannedId);
   };
 

@@ -21,6 +21,7 @@ const aprobacionesRoutes = require('./routes/aprobaciones.routes');
 const reglasRoutes = require('./routes/reglas.routes');
 const usuariosRoutes = require('./routes/usuarios.routes');
 const auditorRoutes = require('./routes/auditor.routes')
+const notificacionesRoutes = require('./routes/notificaciones.routes');
 
 // ==========================================
 // MONTAJE DE ENDPOINTS
@@ -35,6 +36,7 @@ app.use('/api/mantenimientos', mantenimientosRoutes);  // Módulo 4
 app.use('/api/usuarios', usuariosRoutes);              // Módulo 5
 app.use('/api/reglas', reglasRoutes);                  // Módulo 6
 app.use('/api/auditoria', auditorRoutes);              // Módulo 7
+app.use('/api/notificaciones', notificacionesRoutes);  // Módulo Notificaciones
 
 // Endpoint de prueba rápida
 app.get('/', (req, res) => {

@@ -3,15 +3,16 @@ const prisma = require('../services/prisma');
 
 const crearSolicitud = async (req, res) => {
   try {
-    // 1. Extraemos el ID del usuario del token
-    const id_usuario_solicitante = req.usuario_token.id; 
+    // 1. Extraemos ID y Rol del token (inyectado por tu middleware de auth)
+    const id_usuario_solicitante = req.usuario_token.id;
+    const id_rol_usuario = req.usuario_token.id_rol; // 👈 Clave para la lógica bimodal
 
     const { 
       id_activo, 
       tipo_salida, 
       fecha_salida_programada, 
       fecha_devolucion_programada, 
-      id_destino, 
+      id_destino, // Este es el id_proyecto de centros_costo_proyectos
       metodo_transporte 
     } = req.body;
 
@@ -24,67 +25,70 @@ const crearSolicitud = async (req, res) => {
       return res.status(404).json({ error: "El activo solicitado no existe." });
     }
 
-    // Validamos disponibilidad (1 = Disponible)
+    // Validamos disponibilidad (1 = Operativa/Disponible)
     if (activo.id_estado_maquina !== 1) { 
-      return res.status(400).json({ error: "Este equipo no está disponible para préstamo." });
+      return res.status(400).json({ error: "Este equipo no está disponible para préstamo o asignación." });
     }
 
-    // 3. Buscamos las reglas de aprobación
-    let regla = await prisma.reglas_aprobacion.findUnique({
-      where: { id_categoria: activo.id_categoria }
-    });
+    // 🔍 DETERMINAR FLUJO POR ROL
+    const esAdmin = id_rol_usuario === 1; // Suponiendo que 1 es Admin en tu DB
+    const estatusGeneral = esAdmin ? "Aprobada" : "Pendiente";
+    const nuevoEstadoActivo = esAdmin ? 3 : 4; // 3 = Prestada (Directo), 4 = En proceso de préstamo
 
-    if (!regla) {
-      regla = { requiere_gerente: true, requiere_syr: false, requiere_ehs: false };
-    }
+    // 3. Lógica de firmas (Solo si NO es admin)
+    let firmasRequeridas = [];
+    if (!esAdmin) {
+      let regla = await prisma.reglas_aprobacion.findUnique({
+        where: { id_categoria: activo.id_categoria }
+      });
 
-    // 4. Construimos el Arreglo de Firmas con IDs CORRECTOS
-    const firmasRequeridas = [];
+      if (!regla) {
+        regla = { requiere_gerente: true, requiere_syr: false, requiere_ehs: false };
+      }
 
-    if (regla.requiere_gerente) {
-      firmasRequeridas.push({ id_rol_esperado: 3, estatus_firma: "Pendiente" });
-    }
+      if (regla.requiere_gerente) {
+        firmasRequeridas.push({ id_rol_esperado: 3, estatus_firma: "Pendiente" });
+      }
 
-    if (regla.requiere_syr) {
-      firmasRequeridas.push({ id_rol_esperado: 4, estatus_firma: "Pendiente" });
-    }
+      if (regla.requiere_syr) {
+        firmasRequeridas.push({ id_rol_esperado: 4, estatus_firma: "Pendiente" });
+      }
 
-    if (regla.requiere_ehs || tipo_salida.toLowerCase() === 'scrap') {
-      const yaTieneEHS = firmasRequeridas.some(f => f.id_rol_esperado === 5);
-      if (!yaTieneEHS) {
+      if (regla.requiere_ehs || (tipo_salida && tipo_salida.toLowerCase() === 'scrap')) {
         firmasRequeridas.push({ id_rol_esperado: 5, estatus_firma: "Pendiente" });
       }
     }
 
-    // 5. Transacción: Solicitud + Firmas + Cambio de Estado Activo
+    // 4. TRANSACCIÓN ATÓMICA
     const nuevaSolicitud = await prisma.$transaction(async (tx) => {
       
+      // A. Crear la Solicitud
       const solicitud = await tx.solicitudes.create({
         data: {
           id_activo: parseInt(id_activo),
           id_usuario_solicitante: id_usuario_solicitante,
-          id_destino: id_destino ? parseInt(id_destino) : null,
-          tipo_salida: tipo_salida,
-          estatus_general: "Pendiente",
-          fecha_salida_programada: new Date(fecha_salida_programada),
+          id_destino: id_destino ? parseInt(id_destino) : null, // Vinculado a centros_costo_proyectos
+          tipo_salida: tipo_salida || (esAdmin ? "Asignacion Directa" : "Prestamo"),
+          estatus_general: estatusGeneral,
+          fecha_salida_programada: fecha_salida_programada ? new Date(fecha_salida_programada) : new Date(),
           fecha_devolucion_programada: fecha_devolucion_programada ? new Date(fecha_devolucion_programada) : null,
-          metodo_transporte: metodo_transporte
+          metodo_transporte: metodo_transporte || "Interno"
         }
       });
 
+      // B. Crear Firmas (Solo si hay firmas y NO es admin)
       if (firmasRequeridas.length > 0) {
         const firmasData = firmasRequeridas.map(firma => ({
           ...firma,
           id_solicitud: solicitud.id_solicitud
         }));
-
         await tx.aprobaciones_firma.createMany({ data: firmasData });
       }
 
-      // Marcamos el activo como "En proceso de préstamo" (ID 4) para que nadie más lo pida
+      // C. Actualizar Estado del Activo
       await tx.activos.update({
         where: { id_activo: parseInt(id_activo) },
-        data: { id_estado_maquina: 4 } 
+        data: { id_estado_maquina: nuevoEstadoActivo } 
       });
 
       return solicitud;
@@ -92,12 +96,13 @@ const crearSolicitud = async (req, res) => {
 
     res.status(201).json({
       id_solicitud: nuevaSolicitud.id_solicitud,
-      estatus_general: nuevaSolicitud.estatus_general
+      estatus_general: nuevaSolicitud.estatus_general,
+      mensaje: esAdmin ? "Asignación directa realizada con éxito" : "Solicitud creada, pendiente de firmas"
     });
 
   } catch (error) {
-    console.error("Error al crear la solicitud:", error);
-    res.status(500).json({ error: "Error interno al generar la solicitud." });
+    console.error("Error al procesar la solicitud:", error);
+    res.status(500).json({ error: "Error interno al generar la solicitud o asignación." });
   }
 };
 
@@ -123,10 +128,8 @@ const getSolicitudesMaster = async (req, res) => {
       take: take,
       orderBy: { fecha_salida_programada: 'desc' },
       include: {
-        activo: { // <-- CORREGIDO: 'activo'
-          select: { nombre_maquina: true, qr_codigo: true }
-        },
-        solicitante: { // <-- CORREGIDO: 'solicitante'
+        activo: true,
+        solicitante: { 
           select: { nombre_completo: true }
         }
       }
@@ -136,6 +139,7 @@ const getSolicitudesMaster = async (req, res) => {
       id_solicitud: sol.id_solicitud,
       estatus_general: sol.estatus_general,
       activo: {
+        id_activo: sol.activo?.id_activo,
         nombre_maquina: sol.activo?.nombre_maquina || "N/A",
         tag: sol.activo?.qr_codigo || "Sin Tag"
       },

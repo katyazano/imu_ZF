@@ -31,7 +31,7 @@ const getActivos = async (req, res) => {
   }
 };
 
-// 2. OBTENER UN ACTIVO POR ID O QR (El "Controlador Inteligente")
+// 2. OBTENER UN ACTIVO POR ID O QR (Corregido)
 const getActivoById = async (req, res) => {
   const { id } = req.params; 
 
@@ -39,12 +39,14 @@ const getActivoById = async (req, res) => {
     const idNumerico = parseInt(id);
 
     const activo = await prisma.activos.findFirst({
+      // 1. Dónde buscar (where)
       where: {
         OR: [
           { id_activo: isNaN(idNumerico) ? undefined : idNumerico },
           { qr_codigo: id } 
         ]
       },
+      // 2. Qué traer relacionado (include) - Fuera del where
       include: {
         categoria: true,
         estado_maquina: true,
@@ -65,27 +67,41 @@ const getActivoById = async (req, res) => {
   }
 };
 
-// 3. CREAR NUEVO ACTIVO
+// 3. CREAR NUEVO ACTIVO (Ajustado)
 const crearActivo = async (req, res) => {
   try {
     const datos = req.body;
-    const qrGenerado = crypto.randomUUID(); 
+    
+    // Si tu empresa ya usa QRs físicos y el usuario lo escanea, 
+    // usamos ese. Si no, generamos uno aleatorio interno.
+    const qrGenerado = datos.qr_codigo || crypto.randomUUID(); 
+
+    // Extraemos el ID de quien hizo la petición (El Admin o el Gerente)
+    const idResponsable = req.usuario_token ? req.usuario_token.id : 1; // 1 como fallback
 
     const nuevoActivo = await prisma.activos.create({
       data: {
         ...datos,
         qr_codigo: qrGenerado,
-        id_estado_maquina: datos.id_estado_maquina || 1 
+        id_estado_maquina: datos.id_estado_maquina || 1,
+        // Inyectamos el responsable de forma segura
+        id_gerente_responsable: idResponsable,
+        // Igualamos la cantidad actual a la inicial al momento de crear
+        cantidad_actual: datos.cantidad_inicial 
       }
     });
 
     res.status(201).json({
       status: "success",
-      mensaje: "Activo registrado y QR generado correctamente",
+      mensaje: "Activo registrado correctamente",
       activo: nuevoActivo
     });
   } catch (error) {
     console.error("Error al crear activo:", error);
+    // Un error común es que el número de serie o tag ya existan (claves únicas en BD)
+    if (error.code === 'P2002') {
+        return res.status(400).json({ error: "El número de serie, tag o QR ya existen en el sistema." });
+    }
     res.status(500).json({ error: "Error interno al registrar el activo" });
   }
 };
@@ -95,6 +111,13 @@ const actualizarActivo = async (req, res) => {
   try {
     const { id } = req.params;
     const datosNuevos = req.body;
+
+    // 🛡️ EL ESCUDO PARA LAS FECHAS:
+    // Convertimos el string a un objeto Date nativo de JavaScript.
+    // Prisma ama los objetos Date y los convierte a ISO-8601 automáticamente.
+    if (datosNuevos.fecha_compra) {
+        datosNuevos.fecha_compra = new Date(datosNuevos.fecha_compra);
+    }
 
     const activoActualizado = await prisma.activos.update({
       where: { id_activo: parseInt(id) },

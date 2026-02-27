@@ -1,13 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
-import { Plus, ArrowLeft, Loader2 } from 'lucide-react';
+import { Plus, ArrowLeft, Loader2, Edit2 } from 'lucide-react'; // ✅ Agregamos Edit2
 import Navbar from '../components/Navbar';
 
 const Activos = () => {
   const navigate = useNavigate();
   const location = useLocation();
   
-  // 1. 🔍 LEER BÚSQUEDA DESDE LA URL
   const [searchParams] = useSearchParams();
   const queryBusqueda = searchParams.get('q') || ''; 
 
@@ -20,7 +19,6 @@ const Activos = () => {
 
   const rolActivo = parseInt(localStorage.getItem('rol')) || 2; 
 
-  // Estado para los filtros de burbuja
   const [filtroEstado, setFiltroEstado] = useState('Todos');
   const categoriasTabs = ['Todos', 'Mantenimiento', 'Disponible', 'Prestado'];
 
@@ -31,7 +29,6 @@ const Activos = () => {
         const token = localStorage.getItem('token');
         const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
 
-        // Construcción inteligente de la URL
         let url = `${baseUrl}/activos`;
         const queryParms = new URLSearchParams();
 
@@ -53,9 +50,9 @@ const Activos = () => {
         const activosMapeados = data.map(item => ({
           id: item.id_activo.toString(),
           nombre: item.nombre_maquina,
-          estado: item.estado_maquina?.nombre_estado || 'Desconocido', // Corregido: nombre_estado según BD
+          estado: item.estado_maquina?.nombre || 'Desconocido', 
+          tipo: item.disciplina?.nombre || 'General', 
           color: getEstadoColor(item.id_estado_maquina),
-          tipo: item.disciplina?.nombre_disciplina || 'General' // Corregido: nombre_disciplina según BD
         }));
 
         setActivos(activosMapeados);
@@ -67,7 +64,7 @@ const Activos = () => {
     };
 
     fetchActivos();
-  }, [catId, rolActivo]); // Agregado rolActivo a las dependencias
+  }, [catId, rolActivo]);
 
   const getEstadoColor = (idEstado) => {
     switch (idEstado) {
@@ -78,7 +75,6 @@ const Activos = () => {
     }
   };
 
-  // 2. 🧠 FILTRADO INTELIGENTE
   const activosFiltrados = useMemo(() => {
     return activos.filter((activo) => {
       const coincideEstado = filtroEstado === 'Todos' || activo.estado === filtroEstado;
@@ -94,21 +90,20 @@ const Activos = () => {
       <Navbar />
 
       <header className="px-6 mt-10">
-        {/* ✅ ERROR DE SINTAXIS CORREGIDO AQUÍ ✅ */}
         <div className="flex items-center justify-between mb-6">
           <button onClick={() => navigate(-1)} className="p-2 bg-gray-50 rounded-full text-[#0070BC] active:scale-90 transition-transform">
             <ArrowLeft size={20} />
           </button>
           
           <div className="flex gap-2">
-            {rolActivo === 1 && (
+            {/* El Admin y el Gerente pueden agregar activos nuevos */}
+            {(rolActivo === 1 || rolActivo === 3) && (
               <button onClick={() => navigate('/nuevo-activo')} className="p-3 bg-[#0070BC] rounded-2xl text-white shadow-lg active:scale-90 transition-transform">
                 <Plus size={20} strokeWidth={3} />
               </button>
             )}
           </div>
         </div>
-        {/* ==================================== */}
 
         <h1 className="text-4xl font-black text-gray-900 uppercase italic tracking-tighter leading-tight">
           {catNombre || 'Inventario'} <br /> 
@@ -116,7 +111,7 @@ const Activos = () => {
         </h1>
       </header>
 
-      {/* FILTROS DE ESTADO (Tabs) */}
+      {/* FILTROS DE ESTADO */}
       <div className="flex gap-3 px-6 mt-8 overflow-x-auto no-scrollbar pb-2">
         {categoriasTabs.map((cat) => (
           <button
@@ -146,18 +141,13 @@ const Activos = () => {
               activosFiltrados.map((activo) => (
                 <Link 
                   key={activo.id} 
-                  // ✅ Lógica de redirección dinámica según el rol
                   to={
-                    // 1. Si es Auditor (7), va a su ruta de trazabilidad específica
-                    rolActivo === 7 ? `/auditor/trazabilidad/${activo.id}` : 
-                    // 2. Si es Gerente (3), lo mandamos a la ruta que acabamos de ver en tu App.js
-                    rolActivo === 3 ? `/historial-activo/${activo.id}` : 
-                    // 3. Para cualquier otro rol (Usuario General, Admin, etc.), el detalle normal
+                    rolActivo === 7 || rolActivo === 3 ? `/auditor/trazabilidad/${activo.id}` : 
                     `/activo/${activo.id}`
                   }
-                  className="bg-white border-2 border-gray-50 rounded-[30px] p-5 shadow-sm active:scale-[0.98] transition-all group hover:border-blue-100"
+                  className="bg-white border-2 border-gray-50 rounded-[30px] p-5 shadow-sm active:scale-[0.98] transition-all group hover:border-blue-100 flex flex-col"
                 >
-                  <div className="flex justify-between items-start">
+                  <div className="flex justify-between items-start mb-2">
                     <div className="max-w-[70%]">
                       <p className="text-[9px] font-black text-[#0070BC] uppercase tracking-tighter mb-1">ID #{activo.id}</p>
                       <h3 className="font-black text-gray-900 text-lg leading-tight uppercase italic group-hover:text-[#0070BC] transition-colors line-clamp-1">
@@ -169,6 +159,23 @@ const Activos = () => {
                       {activo.estado}
                     </div>
                   </div>
+
+                  {/* ✅ BOTÓN DE EDICIÓN EXCLUSIVO PARA GERENTES (Y ADMINS) */}
+                  {(rolActivo === 3 || rolActivo === 1) && (
+                    <div className="mt-3 pt-3 border-t border-gray-50 flex justify-end">
+                      <button 
+                        onClick={(e) => {
+                          e.preventDefault(); // Evita que se abra el detalle/trazabilidad
+                          e.stopPropagation(); // Detiene el clic de afectar a la tarjeta principal
+                          navigate(`/editar-activo/${activo.id}`);
+                        }}
+                        className="flex items-center gap-2 bg-blue-50 text-[#0070BC] px-4 py-2 rounded-xl hover:bg-[#0070BC] hover:text-white transition-colors"
+                      >
+                        <Edit2 size={14} />
+                        <span className="text-[9px] font-black uppercase tracking-widest">Editar Equipo</span>
+                      </button>
+                    </div>
+                  )}
                 </Link>
               ))
             ) : (

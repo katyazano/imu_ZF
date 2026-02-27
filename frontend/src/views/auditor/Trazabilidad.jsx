@@ -19,14 +19,16 @@ const Trazabilidad = () => {
   // --- CARGA DE DATOS ---
   useEffect(() => {
     const fetchTrazabilidad = async () => {
+      if (!id || id === 'undefined') {
+        setLoading(false);
+        setError("ID de activo no válido.");
+        return;
+      }
       try {
         setLoading(true);
         const token = localStorage.getItem('token');
-        
-        // 🔒 USO DEL .ENV: Tomamos la URL base de tu archivo .env o usamos localhost por defecto
         const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
         
-        // ✅ CORRECCIÓN DE RUTA: Apuntamos al controlador de activos que ya soporta QR Strings
         const response = await fetch(`${baseUrl}/activos/${id}/trazabilidad`, {
           headers: { 
             'Authorization': `Bearer ${token}`,
@@ -48,7 +50,7 @@ const Trazabilidad = () => {
         setHistorialActivo(data.historial || []);
 
       } catch (err) {
-        setError(err.message);
+        console.error(err);
       } finally {
         setLoading(false);
       }
