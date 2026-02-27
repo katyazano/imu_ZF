@@ -4,27 +4,53 @@ const crypto = require('crypto');
 // 1. OBTENER TODOS LOS ACTIVOS (Con filtros inteligentes)
 const getActivos = async (req, res) => {
   try {
-    const { id_categoria, id_estado_maquina, mis_activos } = req.query;
+    const { id_categoria, id_estado_maquina, mis_activos, limit = 50, page = 1, q } = req.query;
+    
     const whereClause = {};
 
     if (id_categoria) whereClause.id_categoria = parseInt(id_categoria);
     if (id_estado_maquina) whereClause.id_estado_maquina = parseInt(id_estado_maquina);
 
-    // 🔒 LA MAGIA: Si el front pide "mis activos", filtramos por el ID del token
+    // Si es gerente y quiere solo los suyos
     if (mis_activos === 'true' && req.usuario_token) {
-      whereClause.id_gerente = req.usuario_token.id; 
+      whereClause.id_gerente_responsable = req.usuario_token.id; 
     }
 
-    const listaActivos = await prisma.activos.findMany({
-      where: whereClause,
-      include: { 
-        categoria: true, 
-        estado_maquina: true,
-        disciplina: true
-      } 
-    });
+    // Búsqueda por texto (Nombre o ID)
+    if (q) {
+      whereClause.OR = [
+        { nombre_maquina: { contains: q, mode: 'insensitive' } },
+        { numero_serie: { contains: q, mode: 'insensitive' } }
+      ];
+      const qNum = parseInt(q);
+      if (!isNaN(qNum)) whereClause.OR.push({ id_activo: qNum }); // Búsqueda exacta por ID
+    }
 
-    res.status(200).json(listaActivos);
+    const parsedLimit = parseInt(limit);
+    const parsedPage = parseInt(page);
+    const skip = (parsedPage - 1) * parsedLimit;
+
+    // Prisma hace DOS cosas al mismo tiempo: Cuenta el total real y trae los 50 de esta página
+    const [totalActivos, listaActivos] = await Promise.all([
+      prisma.activos.count({ where: whereClause }),
+      prisma.activos.findMany({
+        where: whereClause,
+        skip: skip,
+        take: parsedLimit,
+        orderBy: { id_activo: 'desc' }, // Los más nuevos primero
+        include: { categoria: true, estado_maquina: true, disciplina: true } 
+      })
+    ]);
+
+    // Devolvemos el JSON estructurado con la metadata de paginación
+    res.status(200).json({
+      data: listaActivos,
+      meta: {
+        total: totalActivos,
+        paginaActual: parsedPage,
+        totalPaginas: Math.ceil(totalActivos / parsedLimit)
+      }
+    });
   } catch (error) {
     console.error('Error en getActivos:', error);
     res.status(500).json({ error: "Hubo un error al consultar los activos" });
