@@ -220,10 +220,6 @@ const getMisSolicitudes = async (req, res) => {
       })
     ]);
 
-<<<<<<< Updated upstream
-    // Mapeamos al formato exacto
-=======
->>>>>>> Stashed changes
     const respuestaFormateada = misSolicitudes.map(sol => ({
       id_solicitud: sol.id_solicitud,
       estatus_general: sol.estatus_general,
@@ -233,12 +229,6 @@ const getMisSolicitudes = async (req, res) => {
       }
     }));
 
-<<<<<<< Updated upstream
-    // CORRECCIÓN 2: Envolvemos en un objeto con la propiedad "data".
-    // Esto es el estándar de la industria y evita que los map() de React crasheen.
-    res.status(200).json({ data: respuestaFormateada });
-    
-=======
     // 4. Devolvemos el estándar de la industria
     res.status(200).json({ 
       data: respuestaFormateada,
@@ -248,7 +238,6 @@ const getMisSolicitudes = async (req, res) => {
         totalPaginas: Math.ceil(totalRegistros / parsedLimit) || 1
       }
     });
->>>>>>> Stashed changes
   } catch (error) {
     console.error("Error en getMisSolicitudes:", error);
     res.status(500).json({ error: "Error al consultar tus solicitudes" });
