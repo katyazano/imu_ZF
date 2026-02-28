@@ -168,13 +168,8 @@ const getSolicitudesMaster = async (req, res) => {
 
 const getMisSolicitudes = async (req, res) => {
   try {
-<<<<<<< Updated upstream
     // CORRECCIÓN 1: Forzar a que sea un Int. Prisma odia los strings en campos numéricos.
     const id_usuario = parseInt(req.usuario_token.id, 10);
-
-=======
-    const id_usuario = parseInt(req.usuario_token.id, 10);
->>>>>>> Stashed changes
     if (isNaN(id_usuario)) {
       return res.status(400).json({ error: "ID de usuario inválido en el token" });
     }
