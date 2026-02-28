@@ -7,14 +7,15 @@ import {
 import Navbar from '../../components/Navbar';
 
 const categorias = [
-  { id: 1, nombre: 'Línea de producción', icon: <Settings size={32} />, path: '/activos' },
-  { id: 2, nombre: 'Equipo de cómputo', icon: <Monitor size={32} />, path: '/activos' },
-  { id: 3, nombre: 'Laboratorio', icon: <FlaskConical size={32} />, path: '/activos' },
+  
+  { id: 1, nombre: 'Equipo de cómputo', icon: <Monitor size={32} />, path: '/activos' },
+  { id: 2, nombre: 'Laboratorio', icon: <FlaskConical size={32} />, path: '/activos' },
+  { id: 3, nombre: 'Línea de producción', icon: <Settings size={32} />, path: '/activos' },
   { id: 4, nombre: 'Refacciones', icon: <Wrench size={32} />, path: '/activos' },
-  { id: 5, nombre: 'Automóvil', icon: <Car size={32} />, path: '/activos' },
-  { id: 6, nombre: 'Sistemas', icon: <Terminal size={32} />, path: '/activos' },
-  { id: 7, nombre: 'Equipo de comunicación', icon: <Smartphone size={32} />, path: '/activos' },
-  { id: 8, nombre: 'Equipo de medición', icon: <Ruler size={32} />, path: '/activos' },
+  { id: 5, nombre: 'Equipo de medición', icon: <Ruler size={32} />, path: '/activos' },
+  { id: 6, nombre: 'Automóvil', icon: <Car size={32} />, path: '/activos' },
+  { id: 7, nombre: 'Sistemas', icon: <Terminal size={32} />, path: '/activos' },
+  { id: 8, nombre: 'Equipo de comunicación', icon: <Smartphone size={32} />, path: '/activos' },
 ];
 
 const Categorias = () => {

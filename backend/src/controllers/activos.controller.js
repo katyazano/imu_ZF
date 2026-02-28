@@ -1,37 +1,71 @@
 const prisma = require('../services/prisma');
 const crypto = require('crypto');
 
-// 1. OBTENER TODOS LOS ACTIVOS (Con filtros inteligentes)
+// ==========================================
+// 1. OBTENER TODOS LOS ACTIVOS (Con filtros y ORDENAMIENTO)
+// ==========================================
 const getActivos = async (req, res) => {
   try {
-    const { id_categoria, id_estado_maquina, mis_activos } = req.query;
+    // 👇 1. Agregamos 'orden' a lo que recibimos del frontend
+    const { id_categoria, id_estado_maquina, mis_activos, limit = 50, page = 1, q, orden } = req.query;
+    
     const whereClause = {};
 
     if (id_categoria) whereClause.id_categoria = parseInt(id_categoria);
     if (id_estado_maquina) whereClause.id_estado_maquina = parseInt(id_estado_maquina);
-
-    // 🔒 LA MAGIA: Si el front pide "mis activos", filtramos por el ID del token
     if (mis_activos === 'true' && req.usuario_token) {
-      whereClause.id_gerente = req.usuario_token.id; 
+      whereClause.id_gerente_responsable = req.usuario_token.id; 
     }
 
-    const listaActivos = await prisma.activos.findMany({
-      where: whereClause,
-      include: { 
-        categoria: true, 
-        estado_maquina: true,
-        disciplina: true
-      } 
-    });
+    if (q) {
+      whereClause.OR = [
+        { nombre_maquina: { contains: q, mode: 'insensitive' } },
+        { numero_serie: { contains: q, mode: 'insensitive' } },
+        { qr_codigo: { contains: q, mode: 'insensitive' } }
+      ];
+      const qNum = parseInt(q);
+      if (!isNaN(qNum)) whereClause.OR.push({ id_activo: qNum });
+    }
 
-    res.status(200).json(listaActivos);
+    // 👇 2. LÓGICA DE ORDENAMIENTO (SORT)
+    let orderByClause = { id_activo: 'desc' }; // Por defecto: Más recientes
+
+    if (orden === 'antiguos') orderByClause = { id_activo: 'asc' };
+    if (orden === 'a-z') orderByClause = { nombre_maquina: 'asc' };
+    if (orden === 'z-a') orderByClause = { nombre_maquina: 'desc' };
+
+    const parsedLimit = parseInt(limit);
+    const parsedPage = parseInt(page);
+    const skip = (parsedPage - 1) * parsedLimit;
+
+    const [totalActivos, listaActivos] = await Promise.all([
+      prisma.activos.count({ where: whereClause }),
+      prisma.activos.findMany({
+        where: whereClause,
+        skip: skip,
+        take: parsedLimit,
+        orderBy: orderByClause, // 👈 3. Le pasamos la regla a Prisma
+        include: { categoria: true, estado_maquina: true, disciplina: true } 
+      })
+    ]);
+
+    res.status(200).json({
+      data: listaActivos,
+      meta: {
+        total: totalActivos,
+        paginaActual: parsedPage,
+        totalPaginas: Math.ceil(totalActivos / parsedLimit) || 1
+      }
+    });
   } catch (error) {
     console.error('Error en getActivos:', error);
     res.status(500).json({ error: "Hubo un error al consultar los activos" });
   }
 };
 
-// 2. OBTENER UN ACTIVO POR ID O QR (Corregido)
+// ==========================================
+// 2. OBTENER UN ACTIVO POR ID O QR
+// ==========================================
 const getActivoById = async (req, res) => {
   const { id } = req.params; 
 
@@ -39,14 +73,12 @@ const getActivoById = async (req, res) => {
     const idNumerico = parseInt(id);
 
     const activo = await prisma.activos.findFirst({
-      // 1. Dónde buscar (where)
       where: {
         OR: [
           { id_activo: isNaN(idNumerico) ? undefined : idNumerico },
           { qr_codigo: id } 
         ]
       },
-      // 2. Qué traer relacionado (include) - Fuera del where
       include: {
         categoria: true,
         estado_maquina: true,
@@ -67,27 +99,29 @@ const getActivoById = async (req, res) => {
   }
 };
 
-// 3. CREAR NUEVO ACTIVO (Ajustado)
+// ==========================================
+// 3. CREAR NUEVO ACTIVO
+// ==========================================
 const crearActivo = async (req, res) => {
   try {
     const datos = req.body;
     
-    // Si tu empresa ya usa QRs físicos y el usuario lo escanea, 
-    // usamos ese. Si no, generamos uno aleatorio interno.
     const qrGenerado = datos.qr_codigo || crypto.randomUUID(); 
+    const idResponsable = req.usuario_token ? req.usuario_token.id : 1; 
 
-    // Extraemos el ID de quien hizo la petición (El Admin o el Gerente)
-    const idResponsable = req.usuario_token ? req.usuario_token.id : 1; // 1 como fallback
+    // 🛡️ Escudo de fechas en la creación
+    if (datos.fecha_compra) {
+      datos.fecha_compra = new Date(datos.fecha_compra);
+    }
 
     const nuevoActivo = await prisma.activos.create({
       data: {
         ...datos,
         qr_codigo: qrGenerado,
-        id_estado_maquina: datos.id_estado_maquina || 1,
-        // Inyectamos el responsable de forma segura
-        id_gerente_responsable: idResponsable,
-        // Igualamos la cantidad actual a la inicial al momento de crear
-        cantidad_actual: datos.cantidad_inicial 
+        id_estado_maquina: parseInt(datos.id_estado_maquina) || 1,
+        // Permite que el admin asigne a otro gerente, o usa el ID del creador por defecto
+        id_gerente_responsable: parseInt(datos.id_gerente_responsable) || idResponsable,
+        cantidad_actual: parseInt(datos.cantidad_inicial) || 1
       }
     });
 
@@ -98,7 +132,6 @@ const crearActivo = async (req, res) => {
     });
   } catch (error) {
     console.error("Error al crear activo:", error);
-    // Un error común es que el número de serie o tag ya existan (claves únicas en BD)
     if (error.code === 'P2002') {
         return res.status(400).json({ error: "El número de serie, tag o QR ya existen en el sistema." });
     }
@@ -106,15 +139,15 @@ const crearActivo = async (req, res) => {
   }
 };
 
+// ==========================================
 // 4. ACTUALIZAR ACTIVO
+// ==========================================
 const actualizarActivo = async (req, res) => {
   try {
     const { id } = req.params;
     const datosNuevos = req.body;
 
-    // 🛡️ EL ESCUDO PARA LAS FECHAS:
-    // Convertimos el string a un objeto Date nativo de JavaScript.
-    // Prisma ama los objetos Date y los convierte a ISO-8601 automáticamente.
+    // 🛡️ Escudo de fechas en la actualización
     if (datosNuevos.fecha_compra) {
         datosNuevos.fecha_compra = new Date(datosNuevos.fecha_compra);
     }
@@ -131,7 +164,9 @@ const actualizarActivo = async (req, res) => {
   }
 };
 
+// ==========================================
 // 5. DAR DE BAJA
+// ==========================================
 const darDeBajaActivo = async (req, res) => {
   try {
     const { id } = req.params;
@@ -148,13 +183,14 @@ const darDeBajaActivo = async (req, res) => {
   }
 };
 
-// 6. TRAZABILIDAD (Historial Completo) - AHORA INTELIGENTE 🧠
+// ==========================================
+// 6. TRAZABILIDAD (Historial Completo)
+// ==========================================
 const getTrazabilidadActivo = async (req, res) => {
   try {
     const { id } = req.params;
     const idNumerico = parseInt(id);
 
-    // 1. Buscamos el activo por ID o por QR (Igual que en el detalle normal)
     const activo = await prisma.activos.findFirst({
       where: {
         OR: [
@@ -166,9 +202,7 @@ const getTrazabilidadActivo = async (req, res) => {
 
     if (!activo) return res.status(404).json({ error: "Activo no encontrado" });
 
-    // ¡IMPORTANTE! A partir de aquí, usamos el ID real numérico que sacamos de la BD
     const idActivoReal = activo.id_activo;
-
     let lineaDeTiempo = [];
 
     lineaDeTiempo.push({
@@ -177,7 +211,6 @@ const getTrazabilidadActivo = async (req, res) => {
       fecha: activo.fecha_compra || new Date() 
     });
 
-    // 2. Buscamos solicitudes usando el ID real numérico
     const solicitudes = await prisma.solicitudes.findMany({
       where: { id_activo: idActivoReal },
       include: { solicitante: { select: { nombre_completo: true } } },
@@ -192,7 +225,6 @@ const getTrazabilidadActivo = async (req, res) => {
       });
     });
 
-    // 3. Buscamos mantenimientos usando el ID real numérico
     const mantenimientos = await prisma.mantenimientos_incidencias.findMany({
       where: { id_activo: idActivoReal },
       orderBy: { fecha_reporte: 'desc' }
@@ -221,7 +253,6 @@ const getTrazabilidadActivo = async (req, res) => {
   }
 };
 
-// ⚠️ EXPORTACIÓN CLÁSICA DE COMMONJS
 module.exports = {
   getActivos,
   getActivoById,
