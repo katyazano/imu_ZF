@@ -168,25 +168,62 @@ const getSolicitudesMaster = async (req, res) => {
 
 const getMisSolicitudes = async (req, res) => {
   try {
+<<<<<<< Updated upstream
     // CORRECCIÓN 1: Forzar a que sea un Int. Prisma odia los strings en campos numéricos.
     const id_usuario = parseInt(req.usuario_token.id, 10);
 
+=======
+    const id_usuario = parseInt(req.usuario_token.id, 10);
+>>>>>>> Stashed changes
     if (isNaN(id_usuario)) {
       return res.status(400).json({ error: "ID de usuario inválido en el token" });
     }
 
-    // Buscamos SOLO las solicitudes de este usuario
-    const misSolicitudes = await prisma.solicitudes.findMany({
-      where: { id_usuario_solicitante: id_usuario },
-      orderBy: { fecha_salida_programada: 'desc' },
-      include: {
-        activo: {
-          select: { nombre_maquina: true }
-        }
-      }
-    });
+    // 1. Recibimos los parámetros de paginación y filtros desde el frontend
+    const { page = 1, limit = 10, estatus, q } = req.query;
+    
+    // 2. Armamos la cláusula de búsqueda dinámica
+    const whereClause = { id_usuario_solicitante: id_usuario };
 
+    if (estatus) {
+      whereClause.estatus_general = estatus;
+    }
+
+    // Búsqueda inteligente por nombre de máquina o ID de folio
+    if (q) {
+      const orConditions = [
+        { activo: { nombre_maquina: { contains: q, mode: 'insensitive' } } }
+      ];
+      
+      const qNum = parseInt(q, 10);
+      if (!isNaN(qNum)) {
+        orConditions.push({ id_solicitud: qNum });
+      }
+      whereClause.OR = orConditions;
+    }
+
+    const parsedLimit = parseInt(limit, 10);
+    const parsedPage = parseInt(page, 10);
+    const skip = (parsedPage - 1) * parsedLimit;
+
+    // 3. Ejecutamos cuenta total y búsqueda en paralelo
+    const [totalRegistros, misSolicitudes] = await Promise.all([
+      prisma.solicitudes.count({ where: whereClause }),
+      prisma.solicitudes.findMany({
+        where: whereClause,
+        skip: skip,
+        take: parsedLimit,
+        orderBy: { fecha_salida_programada: 'desc' },
+        include: {
+          activo: { select: { nombre_maquina: true } }
+        }
+      })
+    ]);
+
+<<<<<<< Updated upstream
     // Mapeamos al formato exacto
+=======
+>>>>>>> Stashed changes
     const respuestaFormateada = misSolicitudes.map(sol => ({
       id_solicitud: sol.id_solicitud,
       estatus_general: sol.estatus_general,
@@ -196,10 +233,22 @@ const getMisSolicitudes = async (req, res) => {
       }
     }));
 
+<<<<<<< Updated upstream
     // CORRECCIÓN 2: Envolvemos en un objeto con la propiedad "data".
     // Esto es el estándar de la industria y evita que los map() de React crasheen.
     res.status(200).json({ data: respuestaFormateada });
     
+=======
+    // 4. Devolvemos el estándar de la industria
+    res.status(200).json({ 
+      data: respuestaFormateada,
+      meta: {
+        total: totalRegistros,
+        paginaActual: parsedPage,
+        totalPaginas: Math.ceil(totalRegistros / parsedLimit) || 1
+      }
+    });
+>>>>>>> Stashed changes
   } catch (error) {
     console.error("Error en getMisSolicitudes:", error);
     res.status(500).json({ error: "Error al consultar tus solicitudes" });
