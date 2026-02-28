@@ -85,7 +85,7 @@ function App() {
         <Route path="/perfil" element={<RutaProtegida><Perfil /></RutaProtegida>} />
         <Route path="/nuevo-activo" element={<RutaProtegida rolesPermitidos={[1,3]}><NuevoActivo /></RutaProtegida>} />
         <Route path="/editar-activo/:id" element={<RutaProtegida rolesPermitidos={[1,3]}><EditarActivo /></RutaProtegida>} />
-        <Route path="/scanner" element={<RutaProtegida rolesPermitidos={[1, 2, 3, 6, 7]}><Scanner /></RutaProtegida>} />
+        <Route path="/scanner" element={<RutaProtegida rolesPermitidos={[1, 2, 3, 4, 5, 6, 7]}><Scanner /></RutaProtegida>} />
 
         {/* ========================================== */}
         {/* 👑 RUTAS DE ADMINISTRADOR (Rol 1)          */}
