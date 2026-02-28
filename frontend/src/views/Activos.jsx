@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
-import { Plus, ArrowLeft, Loader2, Edit2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, ArrowLeft, Loader2, Edit2, ChevronLeft, ChevronRight, ArrowDownUp } from 'lucide-react';
 import Navbar from '../components/Navbar';
 
 const Activos = () => {
@@ -20,14 +20,15 @@ const Activos = () => {
   // 🔄 NUEVO: Estados para la paginación
   const [paginaActual, setPaginaActual] = useState(1);
   const [totalPaginas, setTotalPaginas] = useState(1);
-  
+
+  const [orden, setOrden] = useState('recientes'); // Estado por defecto
   const [filtroEstado, setFiltroEstado] = useState('Todos');
   const categoriasTabs = ['Todos', 'En mantenimiento', 'Operativa', 'Prestada'];
 
   // Si el usuario cambia de filtro o busca algo nuevo, regresamos a la página 1
   useEffect(() => {
-    setPaginaActual(1);
-  }, [filtroEstado, queryBusqueda, catId]);
+  setPaginaActual(1);
+}, [filtroEstado, queryBusqueda, catId, orden]);
 
   useEffect(() => {
     const fetchActivos = async () => {
@@ -38,11 +39,12 @@ const Activos = () => {
 
         const queryParms = new URLSearchParams();
         queryParms.append('page', paginaActual);
-        queryParms.append('limit', 50); // Traemos de 50 en 50
+        queryParms.append('limit', 25); 
 
         if (catId) queryParms.append('id_categoria', catId);
         if (rolActivo === 3) queryParms.append('mis_activos', 'true');
         if (queryBusqueda) queryParms.append('q', queryBusqueda);
+        if (orden) queryParms.append('orden', orden); // 👈 Le mandamos el orden al backend
 
         // Traducimos el texto del botón al ID de la base de datos
         if (filtroEstado !== 'Todos') {
@@ -82,7 +84,7 @@ const Activos = () => {
     };
 
     fetchActivos();
-  }, [catId, rolActivo, paginaActual, filtroEstado, queryBusqueda]);
+  }, [catId, rolActivo, paginaActual, filtroEstado, queryBusqueda, orden]);
 
   const getEstadoColor = (idEstado) => {
     switch (Number(idEstado)) {
@@ -135,6 +137,29 @@ const Activos = () => {
       </div>
 
       <main className="flex-1 px-6 mt-6 overflow-y-auto pb-28">
+        {/* 👇 NUEVA BARRA DE HERRAMIENTAS DE LISTA 👇 */}
+        <div className="flex justify-between items-center mb-4 px-1">
+          <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+            {activos.length} resultados
+          </span>
+
+          {/* Selector de Orden */}
+          <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100">
+            <ArrowDownUp size={14} className="text-[#0070BC]" />
+            <select
+              value={orden}
+              onChange={(e) => setOrden(e.target.value)}
+              className="bg-transparent text-[10px] font-black uppercase tracking-widest text-gray-600 outline-none cursor-pointer"
+            >
+              <option value="recientes">Más recientes</option>
+              <option value="antiguos">Más antiguos</option>
+              <option value="a-z">Nombre (A - Z)</option>
+              <option value="z-a">Nombre (Z - A)</option>
+            </select>
+          </div>
+        </div>
+        {/* 👆 FIN DE LA NUEVA BARRA 👆 */}
+
         {loading ? (
           <div className="flex flex-col items-center justify-center mt-20 text-gray-400">
             <Loader2 className="animate-spin mb-4 text-[#0070BC]" size={40} />
@@ -143,53 +168,56 @@ const Activos = () => {
         ) : error ? (
            <div className="text-center mt-20 text-red-500 font-bold">{error}</div>
         ) : (
-          <div className="grid grid-cols-1 gap-4">
-            {activos.length > 0 ? (
-              activos.map((activo) => (
-                <Link 
-                  key={activo.id} 
-                  to={rolActivo === 7 || rolActivo === 3 ? `/auditor/trazabilidad/${activo.id}` : `/activo/${activo.id}`}
-                  className="bg-white border-2 border-gray-50 rounded-[30px] p-5 shadow-sm active:scale-[0.98] transition-all group hover:border-blue-100 flex flex-col"
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="max-w-[70%]">
-                      <p className="text-[9px] font-black text-[#0070BC] uppercase tracking-tighter mb-1">ID #{activo.id}</p>
-                      <h3 className="font-black text-gray-900 text-lg leading-tight uppercase italic group-hover:text-[#0070BC] transition-colors line-clamp-1">
-                        {activo.nombre}
-                      </h3>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase mt-1 italic">{activo.tipo}</p>
+          <div className="flex flex-col gap-4">
+            {/* GRID DE ACTIVOS */}
+            <div className="grid grid-cols-1 gap-4">
+              {activos.length > 0 ? (
+                activos.map((activo) => (
+                  <Link 
+                    key={activo.id} 
+                    to={rolActivo === 7 || rolActivo === 3 ? `/auditor/trazabilidad/${activo.id}` : `/activo/${activo.id}`}
+                    className="bg-white border-2 border-gray-50 rounded-[30px] p-5 shadow-sm active:scale-[0.98] transition-all group hover:border-blue-100 flex flex-col"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="max-w-[70%]">
+                        <p className="text-[9px] font-black text-[#0070BC] uppercase tracking-tighter mb-1">ID #{activo.id}</p>
+                        <h3 className="font-black text-gray-900 text-lg leading-tight uppercase italic group-hover:text-[#0070BC] transition-colors line-clamp-1">
+                          {activo.nombre}
+                        </h3>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase mt-1 italic">{activo.tipo}</p>
+                      </div>
+                      <div className={`px-4 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest ${activo.color}`}>
+                        {activo.estado}
+                      </div>
                     </div>
-                    <div className={`px-4 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest ${activo.color}`}>
-                      {activo.estado}
-                    </div>
-                  </div>
 
-                  {(rolActivo === 3 || rolActivo === 1) && (
-                    <div className="mt-3 pt-3 border-t border-gray-50 flex justify-end">
-                      <button 
-                        onClick={(e) => {
-                          e.preventDefault(); 
-                          e.stopPropagation(); 
-                          navigate(`/editar-activo/${activo.id}`);
-                        }}
-                        className="flex items-center gap-2 bg-blue-50 text-[#0070BC] px-4 py-2 rounded-xl hover:bg-[#0070BC] hover:text-white transition-colors"
-                      >
-                        <Edit2 size={14} />
-                        <span className="text-[9px] font-black uppercase tracking-widest">Editar Equipo</span>
-                      </button>
-                    </div>
-                  )}
-                </Link>
-              ))
-            ) : (
-              <div className="text-center py-20 opacity-30">
-                <p className="font-black text-xl uppercase italic">Sin resultados</p>
-                {queryBusqueda && <p className="text-xs mt-1">Buscando: "{queryBusqueda}"</p>}
-              </div>
-            )}
+                    {(rolActivo === 3 || rolActivo === 1) && (
+                      <div className="mt-3 pt-3 border-t border-gray-50 flex justify-end">
+                        <button 
+                          onClick={(e) => {
+                            e.preventDefault(); 
+                            e.stopPropagation(); 
+                            navigate(`/editar-activo/${activo.id}`);
+                          }}
+                          className="flex items-center gap-2 bg-blue-50 text-[#0070BC] px-4 py-2 rounded-xl hover:bg-[#0070BC] hover:text-white transition-colors"
+                        >
+                          <Edit2 size={14} />
+                          <span className="text-[9px] font-black uppercase tracking-widest">Editar Equipo</span>
+                        </button>
+                      </div>
+                    )}
+                  </Link>
+                ))
+              ) : (
+                <div className="text-center py-20 opacity-30">
+                  <p className="font-black text-xl uppercase italic">Sin resultados</p>
+                  {queryBusqueda && <p className="text-xs mt-1">Buscando: "{queryBusqueda}"</p>}
+                </div>
+              )}
+            </div>
 
             {/* 🌟 CONTROLES DE PAGINACIÓN */}
-            {totalPaginas > 1 && (
+            {totalPaginas > 1 && activos.length > 0 && (
               <div className="flex justify-between items-center mt-8 p-4 bg-gray-50 rounded-2xl">
                 <button
                   onClick={() => setPaginaActual(p => Math.max(1, p - 1))}
@@ -212,6 +240,7 @@ const Activos = () => {
                 </button>
               </div>
             )}
+
           </div>
         )}
       </main>
