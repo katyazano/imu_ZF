@@ -42,6 +42,7 @@ const login = async (req, res) => {
     // 🔥 MODO DESARROLLO (2FA APAGADO)
     // Generamos el token inmediatamente y dejamos pasar al usuario sin pedir código.
     // ==========================================
+    /*
     const token = jwt.sign(
       { id: usuario.id_usuario, id_rol: usuario.id_rol, id_disciplina: usuario.id_disciplina },
       process.env.JWT_SECRET,
@@ -52,20 +53,21 @@ const login = async (req, res) => {
       token,
       user: { id: usuario.id_usuario, nombre: usuario.nombre_completo, id_rol: usuario.id_rol }
     });
+    */
 
     // ==========================================
     // 🔒 MODO PRODUCCIÓN (2FA ENCENDIDO)
     // Cuando quieras volver a activar el 2FA, BORRA el bloque de "MODO DESARROLLO" 
     // de arriba y DESCOMENTA las siguientes líneas:
     // ==========================================
-    /*
+    
     const tiene2FA = usuario.secreto_2fa !== null && usuario.secreto_2fa !== '';
     return res.status(200).json({ 
       requires2fa: true, 
       userId: usuario.id_usuario,
       setupRequired: !tiene2FA // Le dice al Front si debe mostrar el QR o solo pedir el código
     });
-    */
+    
 
   } catch (error) {
     console.error('Error en login:', error);

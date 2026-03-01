@@ -218,6 +218,7 @@ const ActivoDetalle = () => {
       <div className="fixed bottom-[72px] lg:bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-white via-white/95 to-transparent pb-8 lg:pb-12 z-40">
         <div className="max-w-md mx-auto flex gap-4">
           {userRole === 1 ? (
+            // Botones para Admin 
              <>
                <button onClick={() => setShowStatusModal(true)} className="flex-1 h-[65px] bg-white border-2 border-gray-100 text-gray-900 rounded-[28px] font-black uppercase text-[10px] tracking-widest flex flex-col items-center justify-center gap-1 active:scale-95 shadow-sm">
                  <Settings2 size={20} className="text-[#0070BC]" /> Estado
@@ -232,11 +233,21 @@ const ActivoDetalle = () => {
                <Info size={20} /> Revisión EHS Activa
              </div>
            ) : (
-             <button onClick={() => navigate('/nueva-solicitud', { state: { activo } })} disabled={activo.id_estado_maquina !== 1}
-               className={`w-full h-[65px] rounded-[30px] font-black uppercase text-xs tracking-[0.2em] flex items-center justify-center gap-3 shadow-2xl ${activo.id_estado_maquina === 1 ? 'bg-[#0070BC] text-white' : 'bg-gray-100 text-gray-400'}`}>
-               <ClipboardList size={22} /> Solicitar Préstamo
-             </button>
-           )}
+              // VISTA PARA USUARIOS GENERALES (Rol 2, 3, etc.)
+              <button 
+                onClick={() => navigate('/nueva-solicitud', { state: { activo } })} 
+                // Bloqueamos SI el ID de estado NO EXISTE o SI es 4 (Baja) o 2 (Mantenimiento)
+                disabled={!activo.id_estado_maquina || activo.id_estado_maquina === 2 || activo.id_estado_maquina === 4}
+                className={`w-full h-[65px] rounded-[30px] font-black uppercase text-xs tracking-[0.2em] flex items-center justify-center gap-3 shadow-2xl transition-all ${
+                  !activo.id_estado_maquina || activo.id_estado_maquina === 2 || activo.id_estado_maquina === 4 
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                    : 'bg-[#0070BC] text-white active:scale-95 hover:bg-blue-700'
+                }`}
+              >
+                <ClipboardList size={22} /> 
+                {activo.id_estado_maquina === 2 ? 'En Reparación' : (activo.id_estado_maquina === 4 ? 'Dado de Baja' : 'Solicitar Préstamo')}
+              </button>
+            )}
         </div>
       </div>
     </div>

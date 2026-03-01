@@ -4,45 +4,49 @@ const exceljs = require('exceljs');
 // ==========================================
 // 1. ENDPOINT: DASHBOARD TRAZABILIDAD (NUEVO ENFOQUE)
 // ==========================================
-// Mantenemos el nombre "getDashboardKPIs" para no romper tus rutas actuales, 
-// pero ahora devuelve ubicaciones y retrasos reales.
 const getDashboardKPIs = async (req, res) => {
   try {
-    const id_rol = req.usuario_token.id_rol;
+    const { id: id_usuario, id_rol } = req.usuario_token; 
+
     if (![1, 2, 3, 4, 6, 7].includes(id_rol)) { 
       return res.status(403).json({ error: "No tienes permiso para ver el control de trazabilidad." });
     }
 
     const hoy = new Date();
+    const filtroGerente = id_rol === 3 ? { id_gerente_responsable: id_usuario } : {};
 
-    // 1. OBTENER SOLO LOS EQUIPOS QUE ESTÁN FÍSICAMENTE FUERA
-    // Buscamos solicitudes aprobadas o en curso
-    const solicitudesActivas = await prisma.solicitudes.findMany({
-      where: {
-        estatus_general: { in: ['Aprobada', 'En curso', 'Vencido'] }
-      },
-      include: {
-        activo: { select: { nombre_maquina: true } },
-        solicitante: { select: { nombre_completo: true } }
-      }
-    });
+    const [totalActivos, solicitudesActivas] = await Promise.all([
+      prisma.activos.count({
+        where: filtroGerente 
+      }),
+      prisma.solicitudes.findMany({
+        where: {
+          activo: filtroGerente,
+          estatus_general: { in: ['Aprobada', 'En curso', 'Vencido'] }
+        },
+        include: {
+          activo: { select: { nombre_maquina: true } },
+          solicitante: { select: { nombre_completo: true } }
+        }
+      })
+    ]);
 
     let devolucionesVencidas = 0;
     let enTiempo = 0;
     let infractoresSet = new Set();
-    let destinosMap = {};
     let listaVencidos = [];
+    
+    // ✅ 1. RECUPERAMOS EL MAPA DE DESTINOS
+    let destinosMap = {};
 
-    // 2. PROCESAMIENTO MATEMÁTICO SÚPER RÁPIDO
     solicitudesActivas.forEach(sol => {
-      // Agrupar por destino (Usamos tipo_salida o id_destino según lo que guardes)
+      // ✅ 2. CALCULAMOS LA CANTIDAD POR DESTINO PARA LA GRÁFICA
       const nombreDestino = sol.tipo_salida || 'Asignación General';
       destinosMap[nombreDestino] = (destinosMap[nombreDestino] || 0) + 1;
 
-      // Evaluar Vencimientos
       if (sol.fecha_devolucion_programada && new Date(sol.fecha_devolucion_programada) < hoy) {
         devolucionesVencidas++;
-        infractoresSet.add(sol.id_usuario_solicitante); // Evita contar a la misma persona 2 veces
+        infractoresSet.add(sol.id_usuario_solicitante);
 
         const diffTime = Math.abs(hoy - new Date(sol.fecha_devolucion_programada));
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -59,32 +63,31 @@ const getDashboardKPIs = async (req, res) => {
       }
     });
 
-    // 3. ORDENAR DATOS (Los más atrasados hasta arriba)
-    listaVencidos.sort((a, b) => b.dias_retraso - a.dias_retraso);
-
+    // ✅ 3. FORMATEAMOS LOS DATOS COMO RECHARTS LOS PIDE (name y cantidad)
     const equiposPorDestino = Object.keys(destinosMap).map(key => ({
       name: key,
       cantidad: destinosMap[key]
     })).sort((a, b) => b.cantidad - a.cantidad);
 
-    // 4. ENVIAR LA ESTRUCTURA EXACTA QUE ESPERA REACT
     res.json({
       kpis: {
         equipos_fuera: solicitudesActivas.length,
         devoluciones_vencidas: devolucionesVencidas,
-        usuarios_infractores: infractoresSet.size
+        usuarios_infractores: infractoresSet.size,
+        total_activos: totalActivos 
       },
       estatus: {
         en_tiempo: enTiempo,
         vencidos: devolucionesVencidas
       },
+      // ✅ 4. ENVIAMOS LA PROPIEDAD AL FRONTEND
       equipos_por_destino: equiposPorDestino,
       lista_vencidos: listaVencidos
     });
 
   } catch (error) {
     console.error('Error en getDashboardKPIs:', error);
-    res.status(500).json({ status: 'error', mensaje: 'Error interno al calcular la trazabilidad' });
+    res.status(500).json({ status: 'error', mensaje: 'Error interno de servidor' });
   }
 };
 

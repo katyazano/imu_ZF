@@ -15,37 +15,45 @@ const GerenteDashboard = () => {
   const [solicitudesRecientes, setSolicitudesRecientes] = useState([]);
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
 
-        const [resPendientes, resActivos] = await Promise.all([
-          fetch(`${baseUrl}/aprobaciones/pendientes`, { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch(`${baseUrl}/activos?mis_activos=true`, { headers: { 'Authorization': `Bearer ${token}` } })
-        ]);
+      // 🚀 Ejecutamos ambas peticiones en paralelo para mayor eficiencia
+      const [resPendientes, resKPIs] = await Promise.all([
+        fetch(`${baseUrl}/aprobaciones/pendientes`, { 
+          headers: { 'Authorization': `Bearer ${token}` } 
+        }),
+        fetch(`${baseUrl}/auditor/dashboard/kpis`, { 
+          headers: { 'Authorization': `Bearer ${token}` } 
+        })
+      ]);
 
-        if (resPendientes.ok && resActivos.ok) {
-          const dataPendientes = await resPendientes.json();
-          const dataActivos = await resActivos.json();
-          
-          setMetricas({
-            pendientes: dataPendientes.length,
-            totalActivos: dataActivos.length || 0,
-            alertas: 0 
-          });
+      if (resPendientes.ok && resKPIs.ok) {
+        const dataPendientes = await resPendientes.json(); // Módulo 3 
+        const dataKPIs = await resKPIs.json();           // Módulo 7 [cite: 32]
+        
+        // Actualizamos todas las métricas con datos reales
+        setMetricas({
+          pendientes: dataPendientes.length, // ✅ Ahora sí toma el conteo real 
+          totalActivos: dataKPIs.kpis.total_activos || 0,
+          alertas: dataKPIs.kpis.devoluciones_vencidas || 0
+        });
 
-          setSolicitudesRecientes(dataPendientes.slice(0, 3));
-        }
-      } catch (error) {
-        console.error("Error al cargar el dashboard:", error);
-      } finally {
-        setLoading(false);
+        // Mostramos las 3 más recientes en la sección "Requieren Atención" 
+        setSolicitudesRecientes(dataPendientes.slice(0, 3));
       }
-    };
+    } catch (error) {
+      console.error("Error al cargar datos del dashboard:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchDashboardData();
-  }, []);
+  fetchDashboardData();
+}, []);
 
   return (
     <div className="min-h-screen bg-white flex flex-col font-sans pb-28">

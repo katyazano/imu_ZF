@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, AlertTriangle, Loader2 } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Loader2, ChevronDown } from 'lucide-react'; // ✅ Añadí ChevronDown
 import Navbar from '../../components/Navbar';
 import ModalExito from '../../components/ModalExito';
 
@@ -8,7 +8,6 @@ const FormularioSolicitud = () => {
   const navigate = useNavigate();
   const location = useLocation();
   
-  // 1. Datos del activo con fallback seguro
   const activo = location.state?.activo || { 
     id_activo: 0, 
     nombre_maquina: "Desconocido", 
@@ -18,19 +17,16 @@ const FormularioSolicitud = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // 2. Estado unificado (Aseguramos que coincida exactamente con las opciones del Radio)
   const [formData, setFormData] = useState({
     tipo_salida: 'Con retorno', 
-    transporte: '',
-    destino: '',
+    transporte: '', // Iniciamos vacío para forzar la selección
+    destino: '',    // Iniciamos vacío para forzar la selección
     fecha_salida: '',
     fecha_devolucion: ''
   });
 
-  // 3. Obtener la fecha de hoy para bloquear fechas pasadas en el calendario
   const hoy = new Date().toISOString().split('T')[0];
 
-  // 4. Manejador centralizado de cambios (Best Practice en React)
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -52,7 +48,6 @@ const FormularioSolicitud = () => {
         tipo_salida: formData.tipo_salida,
         metodo_transporte: formData.transporte,
         fecha_salida_programada: formData.fecha_salida,
-        // Si no es "Con retorno", enviamos null explícitamente
         fecha_devolucion_programada: formData.tipo_salida === 'Con retorno' ? formData.fecha_devolucion : null,
         id_destino: parseInt(formData.destino, 10) || null
       };
@@ -84,7 +79,6 @@ const FormularioSolicitud = () => {
     <div className="min-h-screen bg-white flex flex-col font-sans pb-28">
       <Navbar />
 
-      {/* Header */}
       <header className="bg-[#0070BC] p-6 pt-10 pb-12 flex items-center gap-4">
         <button onClick={() => navigate(-1)} className="text-white active:scale-90 transition-transform hover:opacity-80">
           <ArrowLeft size={28} />
@@ -95,7 +89,6 @@ const FormularioSolicitud = () => {
       <main className="px-6 -mt-8 flex-1">
         <div className="bg-white rounded-[40px] shadow-2xl p-8 border border-gray-100 relative z-10">
           
-          {/* Ficha del Activo */}
           <div className="bg-gray-50 p-5 rounded-[25px] mb-8 space-y-1 border border-gray-100">
             <p className="text-[10px] font-bold text-gray-400 uppercase">Nombre: <span className="text-gray-600">{activo.nombre_maquina}</span></p>
             <p className="text-[10px] font-bold text-gray-400 uppercase">Tag: <span className="text-gray-600">{activo.tag || 'N/A'}</span></p>
@@ -104,7 +97,6 @@ const FormularioSolicitud = () => {
 
           <form onSubmit={handleEnviar} className="space-y-8">
             
-            {/* Tipo de salida */}
             <fieldset>
               <legend className="text-[#0070BC] font-black text-xs uppercase mb-4 italic tracking-widest">Tipo de salida</legend>
               <div className="space-y-3 pl-2">
@@ -124,7 +116,6 @@ const FormularioSolicitud = () => {
               </div>
             </fieldset>
 
-            {/* Advertencia EHS (Dinámica) */}
             {formData.tipo_salida === 'Scrap (chatarra)' && (
               <div className="bg-yellow-50 border-2 border-yellow-100 p-4 rounded-2xl flex gap-3 animate-in fade-in zoom-in duration-300">
                 <AlertTriangle className="text-yellow-500 shrink-0" size={20} />
@@ -134,38 +125,55 @@ const FormularioSolicitud = () => {
               </div>
             )}
 
-            {/* Inputs de Texto/Número */}
+            {/* ✅ DROPDOWNS PARA TRANSPORTE Y DESTINO */}
             <div className="grid grid-cols-2 gap-4">
+              
+              {/* Dropdown Transporte */}
               <div className="space-y-2">
                 <label htmlFor="transporte" className="text-[9px] font-black text-[#0070BC] uppercase tracking-widest ml-2">Transporte</label>
-                <input 
-                  id="transporte"
-                  name="transporte"
-                  required
-                  type="text" 
-                  placeholder="Ej. DHL o Auto"
-                  className="w-full border-2 border-gray-100 rounded-xl p-3 text-xs font-bold outline-none focus:border-[#0070BC] transition-colors"
-                  value={formData.transporte}
-                  onChange={handleChange}
-                />
+                <div className="relative">
+                  <select 
+                    id="transporte"
+                    name="transporte"
+                    required
+                    className="w-full border-2 border-gray-100 rounded-xl p-3 text-xs font-bold text-gray-600 outline-none focus:border-[#0070BC] transition-colors appearance-none bg-white cursor-pointer"
+                    value={formData.transporte}
+                    onChange={handleChange}
+                  >
+                    <option value="" disabled>Selecciona uno...</option>
+                    <option value="Interno / Personal">Interno / Personal</option>
+                    <option value="Vehículo de Empresa">Vehículo de Empresa</option>
+                    <option value="Paquetería Externa">Paquetería Externa</option>
+                    <option value="Proveedor / Tercero">Proveedor / Tercero</option>
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                </div>
               </div>
+
+              {/* Dropdown Destino */}
               <div className="space-y-2">
-                <label htmlFor="destino" className="text-[9px] font-black text-[#0070BC] uppercase tracking-widest ml-2">ID Destino</label>
-                <input 
-                  id="destino"
-                  name="destino"
-                  required
-                  min="1"
-                  type="number" 
-                  placeholder="Ej. 1"
-                  className="w-full border-2 border-gray-100 rounded-xl p-3 text-xs font-bold outline-none focus:border-[#0070BC] transition-colors"
-                  value={formData.destino}
-                  onChange={handleChange}
-                />
+                <label htmlFor="destino" className="text-[9px] font-black text-[#0070BC] uppercase tracking-widest ml-2">Destino / Ubicación</label>
+                <div className="relative">
+                  <select 
+                    id="destino"
+                    name="destino"
+                    required
+                    className="w-full border-2 border-gray-100 rounded-xl p-3 text-xs font-bold text-gray-600 outline-none focus:border-[#0070BC] transition-colors appearance-none bg-white cursor-pointer"
+                    value={formData.destino}
+                    onChange={handleChange}
+                  >
+                    <option value="" disabled>Selecciona una ubicación...</option>
+                    <option value="1">1 - Almacén Central ADAS</option>
+                    <option value="2">2 - Laboratorio de Pruebas A</option>
+                    <option value="3">3 - Caseta de Seguridad</option>
+                    <option value="4">4 - Estante de Refacciones B2</option>
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                </div>
               </div>
+
             </div>
 
-            {/* Calendarios */}
             <div className="bg-blue-50/50 p-6 rounded-[35px] border border-blue-100 space-y-4">
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[9px] font-black text-[#0070BC] uppercase">Salida:</span>
@@ -173,14 +181,13 @@ const FormularioSolicitud = () => {
                   name="fecha_salida"
                   required
                   type="date" 
-                  min={hoy} // Previene fechas pasadas
+                  min={hoy}
                   className="w-full bg-white border-2 border-transparent focus:border-[#0070BC] p-3 pl-16 rounded-xl text-xs font-bold text-gray-500 outline-none shadow-sm transition-colors"
                   value={formData.fecha_salida}
                   onChange={handleChange}
                 />
               </div>
 
-              {/* Devolución Condicional */}
               {formData.tipo_salida === 'Con retorno' && (
                 <div className="relative animate-in slide-in-from-top-2 fade-in duration-300">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[9px] font-black text-[#0070BC] uppercase">Retorno:</span>
@@ -188,7 +195,7 @@ const FormularioSolicitud = () => {
                     name="fecha_devolucion"
                     required
                     type="date" 
-                    min={formData.fecha_salida || hoy} // La devolución no puede ser antes de la salida
+                    min={formData.fecha_salida || hoy}
                     className="w-full bg-white border-2 border-transparent focus:border-[#0070BC] p-3 pl-16 rounded-xl text-xs font-bold text-gray-500 outline-none shadow-sm transition-colors"
                     value={formData.fecha_devolucion}
                     onChange={handleChange}
@@ -197,7 +204,6 @@ const FormularioSolicitud = () => {
               )}
             </div>
 
-            {/* Botón de Envío */}
             <div className="pt-4">
               <button 
                 disabled={loading} 

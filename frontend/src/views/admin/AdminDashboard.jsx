@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ChevronRight, Users, Loader2, ShieldCheck, Settings 
-} from 'lucide-react'; // ✅ Paréntesis borrado y llaves cerradas correctamente
+} from 'lucide-react'; 
 import Navbar from '../../components/Navbar';
 
 const AdminDashboard = () => {
@@ -22,22 +22,16 @@ const AdminDashboard = () => {
         const token = localStorage.getItem('token');
         const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
         
-        const resActivos = await fetch(`${baseUrl}/activos`, {
+        // 🚀 Consultamos el endpoint unificado de KPIs
+        const response = await fetch(`${baseUrl}/auditor/dashboard/kpis`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 
-        const resPrestamos = await fetch(`${baseUrl}/notificaciones`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-
-        if (resActivos.ok) {
-          const dataActivos = await resActivos.json();
-          setTotalActivos(dataActivos.length);
-        }
-
-        if (resPrestamos.ok) {
-          const dataPrestamos = await resPrestamos.json();
-          setTotalPrestamos(dataPrestamos.length);
+        if (response.ok) {
+          const data = await response.json();
+          // Asignamos las métricas reales que vienen del backend
+          setTotalActivos(data.kpis.total_activos || 0);
+          setTotalPrestamos(data.kpis.equipos_fuera || 0);
         }
 
       } catch (error) {
@@ -70,11 +64,12 @@ const AdminDashboard = () => {
           </div>
         ) : (
           <>
+            {/* 🛠️ TARJETA CORREGIDA: Cambiamos {3} por {totalActivos} */}
             <button 
               onClick={() => navigate('/activos')} 
               className="bg-white p-6 rounded-[30px] shadow-sm border border-gray-100 flex flex-col justify-between relative active:scale-95 transition-transform text-left h-36"
             >
-              <span className="text-4xl font-black text-[#0070BC] tracking-tighter">{totalActivos}</span>
+              <span className="text-4xl font-black text-[#0070BC] tracking-tighter">{totalActivos}</span> 
               <span className="text-sm font-black uppercase tracking-tight text-gray-400">Total activos</span>
               <ChevronRight size={20} className="absolute top-6 right-6 text-gray-200" />
             </button>
