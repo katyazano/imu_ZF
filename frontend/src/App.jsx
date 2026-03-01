@@ -92,7 +92,7 @@ function App() {
         {/* ========================================== */}
         <Route path="/adminDashboard" element={<RutaProtegida rolesPermitidos={[1]}><AdminDashboard /></RutaProtegida>} />
         <Route path="/admin-mantenimiento" element={<RutaProtegida rolesPermitidos={[1]}><AdminMantenimiento /></RutaProtegida>} />
-        <Route path="/prestamos-activos" element={<RutaProtegida rolesPermitidos={[1]}><PrestamosActivos /></RutaProtegida>} />
+        <Route path="/prestamos-activos" element={<RutaProtegida rolesPermitidos={[1, 3,, 4, 7]}><PrestamosActivos /></RutaProtegida>} />
         <Route path="/firmas" element={<RutaProtegida rolesPermitidos={[1]}><GestionarFirmas /></RutaProtegida>} />
         <Route path="/admin-usuarios" element={<RutaProtegida rolesPermitidos={[1]}><GestionUsuarios /></RutaProtegida>} />
         

@@ -28,7 +28,19 @@ const Navbar = () => {
 
         if (response.ok) {
           const data = await response.json();
-          setTieneNotificaciones(data.length > 0);
+          
+          // ✅ NUEVA LÓGICA DE LECTURA DE LOCALSTORAGE
+          const leidas = JSON.parse(localStorage.getItem('zf_notifs_leidas')) || [];
+          const ocultas = JSON.parse(localStorage.getItem('zf_notifs_ocultas')) || [];
+
+          // Verificamos si hay al menos una que NO esté en leídas ni en ocultas
+          const hayNuevas = data.some(n => {
+            // Soportamos 'id' (el que armamos en tu controlador), 'id_notificacion', o 'id_firma'
+            const id = n.id || n.id_notificacion || n.id_firma; 
+            return !leidas.includes(id) && !ocultas.includes(id);
+          });
+
+          setTieneNotificaciones(hayNuevas);
         }
       } catch (error) {
         console.error("Error badges:", error);
@@ -36,14 +48,26 @@ const Navbar = () => {
     };
 
     revisarAlertas();
+    
+    // Intervalo normal
     const interval = setInterval(revisarAlertas, 120000);
-    return () => clearInterval(interval);
+    
+    // ✅ ESCUCHADOR EN TIEMPO REAL: Se activa cuando entras a la bandeja de notificaciones
+    window.addEventListener('notificaciones_actualizadas', revisarAlertas);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('notificaciones_actualizadas', revisarAlertas);
+    };
   }, [rolActivo, token, location.pathname]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('rol');
     localStorage.removeItem('nombre');
+    // Por si acaso, limpiamos las notificaciones locales al salir
+    localStorage.removeItem('zf_notifs_leidas');
+    localStorage.removeItem('zf_notifs_ocultas');
     navigate('/', { replace: true });
   };
 
@@ -82,11 +106,6 @@ const Navbar = () => {
   // 2. NUEVA FUNCIÓN: Esto es lo que pasa al presionar la Camarita
   const handleScannerClick = (e) => {
     e.preventDefault(); // 👈 Esto detiene cualquier recarga automática del navegador
-    
-    console.log("📸 Botón de cámara presionado en Navbar");
-    console.log("👤 Rol actual:", rolActivo);
-    console.log("🎯 Ruta destino que se enviará al scanner:", searchConfig.targetPath);
-    
     navigate('/scanner', { state: { targetPath: searchConfig.targetPath } });
   };
 
@@ -103,7 +122,6 @@ const Navbar = () => {
     }
   };
 
-  // ✅ CORRECCIÓN: Logística (4) ya no devuelve links redundantes ni el catálogo de activos
   const getNavLinks = () => {
     switch (rolActivo) {
       case 1: return [{ name: 'Activos', path: '/activos' }, { name: 'Prestamos', path: '/prestamos-activos' }];
@@ -148,7 +166,7 @@ const Navbar = () => {
             </button>
           </div>
 
-          {/* Ocultamos la barra de búsqueda si es Guardia o Logística (si lo deseas ocultar para ellos también, puedes agregar rolActivo !== 4) */}
+          {/* Ocultamos la barra de búsqueda si es Guardia */}
           {rolActivo !== 6 && (
             <div className="flex-1 max-w-2xl mx-8">
               <div className="bg-white rounded-xl flex items-center px-3 py-1.5 text-gray-500 shadow-inner">
@@ -223,7 +241,7 @@ const Navbar = () => {
 
             {/* Botón Central: Scanner (Ambos lo usan) */}
             <button 
-              onClick={handleScannerClick} /* 👈 ESTE ES EL ÚNICO CAMBIO */
+              onClick={handleScannerClick} 
               className="relative flex flex-col items-center justify-center w-full h-full active:scale-90 transition-transform"
             >
               <div className={`absolute -top-6 w-16 h-16 md:w-20 md:h-20 md:-top-8 rounded-full flex items-center justify-center shadow-xl border-4 border-gray-50 ${isActive('/scanner') ? 'bg-gray-900 shadow-gray-900/30' : 'bg-[#0070BC] shadow-blue-900/30'}`}>

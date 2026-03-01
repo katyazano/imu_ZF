@@ -184,7 +184,7 @@ const DetalleSolicitud = () => {
             </div>
           </div>
 
-          {solicitud.tipo_salida?.toLowerCase().includes('scrap') && (
+          {solicitud.tipo_salida?.toLowerCase().includes('Scrap') && (
             <div className="mt-8 bg-orange-50/50 border border-orange-100 p-5 rounded-[25px] flex gap-4">
               <ShieldAlert className="text-orange-500 shrink-0" size={24} />
               <p className="text-[10px] font-bold text-orange-800 uppercase leading-relaxed">

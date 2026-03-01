@@ -54,7 +54,7 @@ const crearSolicitud = async (req, res) => {
         firmasRequeridas.push({ id_rol_esperado: 4, estatus_firma: "Pendiente" });
       }
 
-      if (regla.requiere_ehs || (tipo_salida && tipo_salida.toLowerCase() === 'scrap')) {
+      if (regla.requiere_ehs || (tipo_salida && tipo_salida.toLowerCase() === 'Scrap')) {
         firmasRequeridas.push({ id_rol_esperado: 5, estatus_firma: "Pendiente" });
       }
     }
@@ -108,60 +108,98 @@ const crearSolicitud = async (req, res) => {
 
 const getSolicitudesMaster = async (req, res) => {
   try {
-    const id_rol = req.usuario_token.id_rol; 
-    const rolesPermitidos = [1, 6, 7];
-    
+    const id_rol = req.usuario_token.id_rol;
+    const id_usuario_auth = req.usuario_token.id;
+
+    // 1. Validación de permisos
+    const rolesPermitidos = [1, 3, 6, 7];
     if (!rolesPermitidos.includes(id_rol)) {
-      return res.status(403).json({ error: "Acceso denegado. Tu rol no tiene permisos para auditar el historial maestro." });
+      return res.status(403).json({ error: "No tienes permiso para ver el historial maestro." });
     }
 
     const { estatus, page = 1, limit = 10 } = req.query;
-    const whereClause = {};
-    if (estatus) whereClause.estatus_general = estatus;
+    
+    // 2. Construcción de la cláusula de filtrado dinámica
+    let whereClause = {};
 
+    // 🚀 LÓGICA SIMPLIFICADA
+    // Como el Cron Job ya actualiza la BD, solo buscamos el estatus que pida el usuario
+    // Si estatus es 'Vencido', traerá lo que el Cron ya marcó físicamente.
+    if (estatus && estatus !== 'Todos') {
+      whereClause.estatus_general = estatus;
+    }
+
+    // 🚀 FILTRO DE DISCIPLINA PARA GERENTE (ROL 3)
+    if (id_rol === 3) {
+      const gerente = await prisma.usuarios.findUnique({
+        where: { id_usuario: id_usuario_auth },
+        select: { id_disciplina: true }
+      });
+
+      if (gerente && gerente.id_disciplina) {
+        whereClause.activo = {
+          id_disciplina: gerente.id_disciplina
+        };
+      } else {
+        return res.status(200).json({ data: [], paginacion: { total: 0 } });
+      }
+    }
+
+    // 3. Paginación
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const take = parseInt(limit);
 
-    const solicitudes = await prisma.solicitudes.findMany({
-      where: whereClause,
-      skip: skip,
-      take: take,
-      orderBy: { fecha_salida_programada: 'desc' },
-      include: {
-        activo: true,
-        solicitante: { 
-          select: { nombre_completo: true }
+    // 4. Ejecución de consultas en paralelo
+    const [totalRegistros, solicitudes] = await Promise.all([
+      prisma.solicitudes.count({ where: whereClause }),
+      prisma.solicitudes.findMany({
+        where: whereClause,
+        skip: skip,
+        take: take,
+        orderBy: { fecha_creacion: 'desc' },
+        include: {
+          activo: {
+            select: {
+              id_activo: true,
+              nombre_maquina: true,
+              qr_codigo: true, 
+            }
+          },
+          solicitante: { 
+            select: { nombre_completo: true }
+          }
         }
-      }
-    });
+      })
+    ]);
 
+    // 5. Mapeo de respuesta
     const respuestaFormateada = solicitudes.map(sol => ({
       id_solicitud: sol.id_solicitud,
+      id_activo: sol.activo?.id_activo,
       estatus_general: sol.estatus_general,
       activo: {
-        id_activo: sol.activo?.id_activo,
         nombre_maquina: sol.activo?.nombre_maquina || "N/A",
         tag: sol.activo?.qr_codigo || "Sin Tag"
       },
       solicitante: {
         nombre_completo: sol.solicitante?.nombre_completo || "Usuario Desconocido"
-      }
+      },
+      fecha_creacion: sol.fecha_creacion 
     }));
 
-    const totalRegistros = await prisma.solicitudes.count({ where: whereClause });
-
+    // 6. Respuesta final
     res.status(200).json({
       data: respuestaFormateada,
       paginacion: {
         total: totalRegistros,
         pagina_actual: parseInt(page),
         limite: parseInt(limit),
-        total_paginas: Math.ceil(totalRegistros / limit)
+        total_paginas: Math.ceil(totalRegistros / limit) || 1
       }
     });
 
   } catch (error) {
-    console.error("Error en getSolicitudesMaster:", error);
+    console.error("Error crítico en getSolicitudesMaster:", error);
     res.status(500).json({ error: "Error al consultar el historial maestro" });
   }
 };
