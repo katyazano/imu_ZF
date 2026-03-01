@@ -32,8 +32,8 @@ const AuditorDashboard = () => {
         setLoading(true);
         const token = localStorage.getItem('token');
         
-        // 🚀 CORRECCIÓN AQUÍ: Apunta a /auditor/dashboard/kpis para que coincida con tu backend
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000/api'}/auditor/dashboard/kpis`, {
+        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+        const response = await fetch(`${baseUrl}/auditor/dashboard/kpis`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -54,10 +54,9 @@ const AuditorDashboard = () => {
         ]);
 
         setListaVencidos(data.lista_vencidos || []);
-        setError(null); // Limpiamos cualquier error previo
+        setError(null); 
 
       } catch (err) {
-        // 🚀 CORRECCIÓN AQUÍ: Restauramos el setError para que la pantalla de error funcione
         console.error("Error cargando el dashboard:", err);
         setError("Hubo un problema de conexión con el servidor. Verifica que esté en línea.");
       } finally {
@@ -72,8 +71,9 @@ const AuditorDashboard = () => {
     try {
       setIsExporting(true);
       const token = localStorage.getItem('token');
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
       
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000/api'}/auditor/reportes/exportar`, {
+      const response = await fetch(`${baseUrl}/auditor/reportes/exportar`, {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -135,7 +135,6 @@ const AuditorDashboard = () => {
             
                 {/* 🚨 KPIs CRÍTICOS DE CONTROL 🚨 */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-                    {/* Equipos Fuera */}
                     <div onClick={() => navigate('/prestamos-activos')} className="bg-white p-5 rounded-[25px] shadow-sm border border-gray-100 flex flex-col justify-center cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all group">
                         <div className="flex items-center gap-2 mb-2">
                             <MapPin size={16} className="text-[#0070BC]" />
@@ -147,7 +146,6 @@ const AuditorDashboard = () => {
                         </div>
                     </div>
                     
-                    {/* Vencidos (ALERTA ROJA) */}
                     <div onClick={() => navigate('/prestamos-activos?estatus=Vencido')} className="bg-red-50 p-5 rounded-[25px] shadow-sm border border-red-100 flex flex-col justify-center cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all group">
                         <div className="flex items-center gap-2 mb-2">
                             <AlertTriangle size={16} className="text-red-600 animate-pulse" />
@@ -159,7 +157,6 @@ const AuditorDashboard = () => {
                         </div>
                     </div>
 
-                    {/* Usuarios Infractores */}
                     <div className="bg-white p-5 rounded-[25px] shadow-sm border border-gray-100 flex flex-col justify-center">
                         <div className="flex items-center gap-2 mb-2">
                             <UserX size={16} className="text-orange-500" />
@@ -171,10 +168,8 @@ const AuditorDashboard = () => {
                     </div>
                 </div>
 
-                {/* 🛠️ BOTONES DE ACCIÓN (INVENTARIO Y REPORTE) */}
+                {/* 🛠️ BOTONES DE ACCIÓN */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    
-                    {/* Botón 1: Ir a Inventario / Activos */}
                     <button 
                         onClick={() => navigate('/activos')} 
                         className="w-full bg-white border-2 border-gray-100 p-4 rounded-[25px] flex items-center justify-between transition-all shadow-sm group hover:border-[#0070BC] active:scale-95"
@@ -191,7 +186,6 @@ const AuditorDashboard = () => {
                         <ChevronRight size={20} className="text-gray-300 group-hover:text-[#0070BC] transition-transform group-hover:translate-x-1" />
                     </button>
 
-                    {/* Botón 2: Exportar Excel (El que ya tenías, ajustado) */}
                     <button 
                         onClick={handleExportExcel} 
                         disabled={isExporting} 
@@ -207,13 +201,11 @@ const AuditorDashboard = () => {
                             </div>
                         </div>
                     </button>
-                    
                 </div>
 
                 {/* 📊 SECCIÓN: ¿DÓNDE ESTÁN LOS EQUIPOS? */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     
-                    {/* Gráfica 1: Ubicaciones Exactas (Con nombres largos solucionado) */}
                     <div className="bg-white p-6 rounded-[35px] shadow-sm border border-gray-100">
                         <h4 className="font-black text-gray-900 mb-6 uppercase text-[10px] tracking-widest flex items-center gap-2">
                             <MapPin size={14} className="text-[#0070BC]"/> Destinos Actuales
@@ -238,7 +230,6 @@ const AuditorDashboard = () => {
                         </div>
                     </div>
 
-                    {/* Gráfica 2: Estatus de los Préstamos */}
                     <div className="bg-white p-6 rounded-[35px] shadow-sm border border-gray-100 flex flex-col justify-center">
                         <h4 className="font-black text-gray-900 mb-2 uppercase text-[10px] tracking-widest flex items-center gap-2">
                             <Clock size={14} className="text-gray-400"/> Estatus de Entregas
@@ -284,10 +275,12 @@ const AuditorDashboard = () => {
                     {listaVencidos.length > 0 ? (
                         <div className="flex flex-col gap-3">
                             {listaVencidos.map((infractor) => (
-                                <div key={infractor.id} onClick={() => navigate(`/solicitud/${infractor.id}`)} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-gray-50 hover:bg-red-50 rounded-[20px] transition-colors cursor-pointer group border border-transparent hover:border-red-100 gap-4 md:gap-0">
+                                // 🛑 BLOQUE 100% ESTÁTICO (Sin onClick, sin cursor-pointer, sin hover)
+                                <div key={infractor.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-gray-50 rounded-[20px] border border-gray-100 gap-4 md:gap-0">
                                     <div className="flex items-center gap-4">
                                         <div className="bg-white p-2 rounded-full shadow-sm">
-                                            <UserX size={18} className="text-red-400 group-hover:text-red-600 transition-colors" />
+                                            {/* Icono fijo en rojo */}
+                                            <UserX size={18} className="text-red-500" />
                                         </div>
                                         <div>
                                             <h5 className="font-black text-sm text-gray-900 uppercase italic leading-tight">{infractor.solicitante}</h5>
@@ -302,7 +295,6 @@ const AuditorDashboard = () => {
                             ))}
                         </div>
                     ) : (
-                        // Muestra esto si no hay nadie vencido
                         <div className="text-center py-10 bg-gray-50 rounded-[20px] border border-dashed border-gray-200">
                             <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">
                                 No hay equipos con retraso

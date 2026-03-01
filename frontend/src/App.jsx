@@ -92,7 +92,7 @@ function App() {
         {/* ========================================== */}
         <Route path="/adminDashboard" element={<RutaProtegida rolesPermitidos={[1]}><AdminDashboard /></RutaProtegida>} />
         <Route path="/admin-mantenimiento" element={<RutaProtegida rolesPermitidos={[1]}><AdminMantenimiento /></RutaProtegida>} />
-        <Route path="/prestamos-activos" element={<RutaProtegida rolesPermitidos={[1, 3,, 4, 7]}><PrestamosActivos /></RutaProtegida>} />
+        <Route path="/prestamos-activos" element={<RutaProtegida rolesPermitidos={[1, 3, 4, 7]}><PrestamosActivos /></RutaProtegida>} />
         <Route path="/firmas" element={<RutaProtegida rolesPermitidos={[1]}><GestionarFirmas /></RutaProtegida>} />
         <Route path="/admin-usuarios" element={<RutaProtegida rolesPermitidos={[1]}><GestionUsuarios /></RutaProtegida>} />
         
@@ -104,7 +104,7 @@ function App() {
         <Route path="/categorias" element={<RutaProtegida rolesPermitidos={[1, 2]}><Categorias /></RutaProtegida>} />
         <Route path="/nueva-solicitud" element={<RutaProtegida rolesPermitidos={[1, 2]}><FormularioSolicitud /></RutaProtegida>} />
         <Route path="/mis-solicitudes" element={<RutaProtegida rolesPermitidos={[1, 2]}><MisSolicitudes /></RutaProtegida>} />
-        <Route path="/solicitud/:id" element={<RutaProtegida rolesPermitidos={[1, 2, 3, 4, 5]}><DetalleSolicitud /></RutaProtegida>} />
+        <Route path="/solicitud/:id" element={<RutaProtegida rolesPermitidos={[1, 2, 3, 4, 5, 7]}><DetalleSolicitud /></RutaProtegida>} />
 
         {/* ========================================== */}
         {/* 👔 RUTAS DE GERENTE (Rol 3)                */}

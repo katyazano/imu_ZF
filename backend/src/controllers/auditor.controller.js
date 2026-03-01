@@ -53,6 +53,7 @@ const getDashboardKPIs = async (req, res) => {
 
         listaVencidos.push({
           id: sol.id_solicitud,
+          id_activo: sol.id_activo,
           solicitante: sol.solicitante?.nombre_completo || 'Usuario Desconocido',
           equipo: sol.activo?.nombre_maquina || 'Equipo sin nombre',
           destino: nombreDestino,

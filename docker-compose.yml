@@ -1,29 +1,20 @@
-services:
-  db:
-    image: postgres:15-alpine
-    container_name: zf_db
-    restart: always
-    environment:
-      POSTGRES_USER: user_zf
-      POSTGRES_PASSWORD: password_zf
-      POSTGRES_DB: zf_patrimonial
-    ports:
-      - "5432:5432"
+version: '3.8'
 
+services:
   backend:
     build: ./backend
-    container_name: zf_api
+    container_name: zf_halo_backend
     ports:
-      - "3000:3000"
-    environment:
-      - DATABASE_URL=postgresql://user_zf:password_zf@db:5432/zf_patrimonial?schema=public
-    depends_on:
-      - db
+      - "4000:4000"
+    env_file:
+      - ./backend/.env # Toma las variables de entorno de tu .env (como DATABASE_URL)
+    restart: always
 
   frontend:
     build: ./frontend
-    container_name: zf_web
+    container_name: zf_halo_frontend
     ports:
-      - "5173:5173"
+      - "5173:80" # Mapea el puerto 80 del Nginx al 5173 de tu máquina
     depends_on:
       - backend
+    restart: always
