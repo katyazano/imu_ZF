@@ -1,106 +1,181 @@
-// src/controllers/activos.controller.js
 const prisma = require('../services/prisma');
-const crypto = require('crypto'); // <-- 1. Importas la librería nativa de Node.js
+const crypto = require('crypto');
 
+// ==========================================
+// 1. OBTENER TODOS LOS ACTIVOS (Con filtros y ORDENAMIENTO)
+// ==========================================
 const getActivos = async (req, res) => {
   try {
-    // CORRECCIÓN: Cambiamos id_estado por id_estado_maquina
-    const { id_categoria, id_estado_maquina } = req.query;
+    // 👇 1. Agregamos 'orden' a lo que recibimos del frontend
+    const { id_categoria, id_estado_maquina, mis_activos, limit = 50, page = 1, q, orden } = req.query;
     
     const whereClause = {};
+
     if (id_categoria) whereClause.id_categoria = parseInt(id_categoria);
     if (id_estado_maquina) whereClause.id_estado_maquina = parseInt(id_estado_maquina);
+    if (mis_activos === 'true' && req.usuario_token) {
+      whereClause.id_gerente_responsable = req.usuario_token.id; 
+    }
 
-    const listaActivos = await prisma.activos.findMany({
-      where: whereClause,
-      // CORRECCIÓN en include (nombres reales del schema actual)
-      include: { 
-        categoria: true, 
-        estado_maquina: true 
-      } 
+    if (q) {
+      whereClause.OR = [
+        { nombre_maquina: { contains: q, mode: 'insensitive' } },
+        { numero_serie: { contains: q, mode: 'insensitive' } },
+        { qr_codigo: { contains: q, mode: 'insensitive' } }
+      ];
+      const qNum = parseInt(q);
+      if (!isNaN(qNum)) whereClause.OR.push({ id_activo: qNum });
+    }
+
+    // 👇 2. LÓGICA DE ORDENAMIENTO (SORT)
+    let orderByClause = { id_activo: 'desc' }; // Por defecto: Más recientes
+
+    if (orden === 'antiguos') orderByClause = { id_activo: 'asc' };
+    if (orden === 'a-z') orderByClause = { nombre_maquina: 'asc' };
+    if (orden === 'z-a') orderByClause = { nombre_maquina: 'desc' };
+
+    const parsedLimit = parseInt(limit);
+    const parsedPage = parseInt(page);
+    const skip = (parsedPage - 1) * parsedLimit;
+
+    const [totalActivos, listaActivos] = await Promise.all([
+      prisma.activos.count({ where: whereClause }),
+      prisma.activos.findMany({
+        where: whereClause,
+        skip: skip,
+        take: parsedLimit,
+        orderBy: orderByClause, // 👈 3. Le pasamos la regla a Prisma
+        include: { categoria: true, estado_maquina: true, disciplina: true } 
+      })
+    ]);
+
+    res.status(200).json({
+      data: listaActivos,
+      meta: {
+        total: totalActivos,
+        paginaActual: parsedPage,
+        totalPaginas: Math.ceil(totalActivos / parsedLimit) || 1
+      }
     });
-
-    res.status(200).json(listaActivos);
   } catch (error) {
     console.error('Error en getActivos:', error);
     res.status(500).json({ error: "Hubo un error al consultar los activos" });
   }
 };
 
-const getActivoPorId = async (req, res) => {
+// ==========================================
+// 2. OBTENER UN ACTIVO POR ID O QR
+// ==========================================
+const getActivoById = async (req, res) => {
+  const { id } = req.params; 
+
   try {
-    const { id } = req.params;
-    const activo = await prisma.activos.findUnique({
-      where: { id_activo: parseInt(id) }
+    const idNumerico = parseInt(id);
+
+    const activo = await prisma.activos.findFirst({
+      where: {
+        OR: [
+          { id_activo: isNaN(idNumerico) ? undefined : idNumerico },
+          { qr_codigo: id } 
+        ]
+      },
+      include: {
+        categoria: true,
+        estado_maquina: true,
+        disciplina: true,
+        ubicacion: true,
+        gerente: { select: { nombre_completo: true } }
+      }
     });
 
     if (!activo) {
-      return res.status(404).json({ error: "Activo no encontrado" });
+      return res.status(404).json({ error: "Activo no registrado en ZF" });
     }
 
-    res.status(200).json(activo);
+    res.json(activo);
   } catch (error) {
-    console.error('Error en getActivoPorId:', error);
-    res.status(500).json({ error: "Hubo un error al buscar el activo" });
+    console.error('Error en getActivoById:', error);
+    res.status(500).json({ error: "Error interno del servidor" });
   }
 };
 
+// ==========================================
+// 3. CREAR NUEVO ACTIVO
+// ==========================================
 const crearActivo = async (req, res) => {
   try {
-    const datosDelFrontend = req.body;
+    const datos = req.body;
+    
+    const qrGenerado = datos.qr_codigo || crypto.randomUUID(); 
+    const idResponsable = req.usuario_token ? req.usuario_token.id : 1; 
 
-    // 2. GENERACIÓN AUTOMÁTICA DEL QR (Crea un UUID único mundial)
-    const qrGenerado = crypto.randomUUID(); 
+    // 🛡️ Escudo de fechas en la creación
+    if (datos.fecha_compra) {
+      datos.fecha_compra = new Date(datos.fecha_compra);
+    }
 
-    // 3. Guardamos en la base de datos
     const nuevoActivo = await prisma.activos.create({
       data: {
-        ...datosDelFrontend,
-        qr_codigo: qrGenerado, // <-- Le inyectamos el UUID generado
-        id_estado_maquina: 1   // <-- 1 = "Operativa" por defecto (opcional, si no viene en el body)
+        ...datos,
+        qr_codigo: qrGenerado,
+        id_estado_maquina: parseInt(datos.id_estado_maquina) || 1,
+        // Permite que el admin asigne a otro gerente, o usa el ID del creador por defecto
+        id_gerente_responsable: parseInt(datos.id_gerente_responsable) || idResponsable,
+        cantidad_actual: parseInt(datos.cantidad_inicial) || 1
       }
     });
 
     res.status(201).json({
       status: "success",
-      mensaje: "Activo registrado y QR generado correctamente",
+      mensaje: "Activo registrado correctamente",
       activo: nuevoActivo
     });
-
   } catch (error) {
     console.error("Error al crear activo:", error);
+    if (error.code === 'P2002') {
+        return res.status(400).json({ error: "El número de serie, tag o QR ya existen en el sistema." });
+    }
     res.status(500).json({ error: "Error interno al registrar el activo" });
   }
 };
 
+// ==========================================
+// 4. ACTUALIZAR ACTIVO
+// ==========================================
 const actualizarActivo = async (req, res) => {
   try {
     const { id } = req.params;
     const datosNuevos = req.body;
+
+    // 🛡️ Escudo de fechas en la actualización
+    if (datosNuevos.fecha_compra) {
+        datosNuevos.fecha_compra = new Date(datosNuevos.fecha_compra);
+    }
 
     const activoActualizado = await prisma.activos.update({
       where: { id_activo: parseInt(id) },
       data: datosNuevos 
     });
 
-    res.status(200).json({ status: "success", activo_actualizado: true, data: activoActualizado });
+    res.status(200).json({ status: "success", data: activoActualizado });
   } catch (error) {
     console.error('Error al actualizar:', error);
     res.status(400).json({ error: "No se pudo actualizar el activo" });
   }
 };
 
+// ==========================================
+// 5. DAR DE BAJA
+// ==========================================
 const darDeBajaActivo = async (req, res) => {
   try {
     const { id } = req.params;
     
-    // CORRECCIÓN: Usamos id_estado_maquina en lugar de id_estado
     await prisma.activos.update({
       where: { id_activo: parseInt(id) },
-      data: { id_estado_maquina: 4 } // Asumiendo que 4 es el ID para "Dado de baja"
+      data: { id_estado_maquina: 4 } 
     });
 
-    // CORRECCIÓN: Ajustamos el mensaje para que sea exactamente el que tu compañero documentó
     res.status(200).json({ status: "success", mensaje: "Activo dado de baja" });
   } catch (error) {
     console.error('Error en dar de baja:', error);
@@ -109,80 +184,80 @@ const darDeBajaActivo = async (req, res) => {
 };
 
 // ==========================================
-// NUEVO ENDPOINT: TRAZABILIDAD (LÍNEA DE TIEMPO)
+// 6. TRAZABILIDAD (Historial Completo)
 // ==========================================
 const getTrazabilidadActivo = async (req, res) => {
   try {
-    const idActivo = parseInt(req.params.id);
+    const { id } = req.params;
+    const idNumerico = parseInt(id);
 
-    // 1. Obtener los datos base del activo
-    const activo = await prisma.activos.findUnique({
-      where: { id_activo: idActivo }
+    const activo = await prisma.activos.findFirst({
+      where: {
+        OR: [
+          { id_activo: isNaN(idNumerico) ? undefined : idNumerico },
+          { qr_codigo: id }
+        ]
+      }
     });
 
-    if (!activo) {
-      return res.status(404).json({ error: "Activo no encontrado" });
-    }
+    if (!activo) return res.status(404).json({ error: "Activo no encontrado" });
 
-    // 2. Arreglo maestro donde meteremos TODOS los eventos
+    const idActivoReal = activo.id_activo;
     let lineaDeTiempo = [];
 
-    // A) EVENTO 1: ADQUISICIÓN (Suponiendo que tu tabla tiene fecha_creacion o similar)
-    // Si tu campo de fecha de alta se llama distinto en Prisma, solo cámbialo aquí
     lineaDeTiempo.push({
       tipo_evento: 'ADQUISICIÓN',
-      descripcion: 'Registro inicial en el sistema de inventario.',
-      // Si no tienes un campo de fecha de creación, usamos una fecha por defecto o la actual para que no truene
-      fecha: activo.fecha_creacion || activo.created_at || new Date('2024-01-01') 
+      descripcion: 'Alta inicial en el sistema ZF Assets.',
+      fecha: activo.fecha_compra || new Date() 
     });
 
-    // B) EVENTOS 2: HISTORIAL DE PRÉSTAMOS
-    const prestamos = await prisma.solicitudes.findMany({
-      where: { id_activo: idActivo },
-      include: { solicitante: { select: { nombre_completo: true } } }
+    const solicitudes = await prisma.solicitudes.findMany({
+      where: { id_activo: idActivoReal },
+      include: { solicitante: { select: { nombre_completo: true } } },
+      orderBy: { fecha_creacion: 'desc' }
     });
 
-    prestamos.forEach(p => {
+    solicitudes.forEach(s => {
       lineaDeTiempo.push({
-        tipo_evento: p.estatus_general === 'En curso' ? 'PRÉSTAMO ACTUAL' : 'HISTORIAL DE PRÉSTAMO',
-        descripcion: `Asignado a ${p.solicitante?.nombre_completo || 'Usuario Desconocido'} - Estatus: ${p.estatus_general}`,
-        fecha: p.fecha_creacion 
+        tipo_evento: `SOLICITUD: ${s.estatus_general.toUpperCase()}`,
+        descripcion: `Solicitado por ${s.solicitante?.nombre_completo}. Destino: ${s.tipo_salida}`,
+        fecha: s.fecha_creacion
       });
     });
 
-    // C) EVENTOS 3: MANTENIMIENTOS 
-    // Lo envolvemos en un try/catch interno por si tu tabla de mantenimientos aún no está conectada en Prisma
-    try {
-      const mantenimientos = await prisma.mantenimientos.findMany({
-        where: { id_activo: idActivo }
+    const mantenimientos = await prisma.mantenimientos_incidencias.findMany({
+      where: { id_activo: idActivoReal },
+      orderBy: { fecha_reporte: 'desc' }
+    });
+    
+    mantenimientos.forEach(m => {
+      lineaDeTiempo.push({
+        tipo_evento: 'MANTENIMIENTO / INCIDENCIA',
+        descripcion: `${m.tipo_mantenimiento}: ${m.descripcion}. Estatus: ${m.estatus_reparacion}`,
+        fecha: m.fecha_reporte
       });
-      
-      mantenimientos.forEach(m => {
-        lineaDeTiempo.push({
-          tipo_evento: 'MANTENIMIENTO',
-          descripcion: m.descripcion || m.tipo_mantenimiento || 'Revisión técnica programada',
-          fecha: m.fecha_inicio || m.fecha_creacion // Ajusta al campo de fecha de tu tabla mantenimientos
-        });
-      });
-    } catch (error) {
-      console.log('Nota: No se pudo cargar mantenimientos o la tabla no existe aún.');
-    }
+    });
 
-    // 3. ORDENAR CRONOLÓGICAMENTE (Del más reciente al más antiguo)
     lineaDeTiempo.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
-    // 4. Devolver la estructura perfecta para el frontend
     res.status(200).json({
-      activo_id: idActivo,
-      nombre_maquina: activo.nombre_maquina,
-      numero_serie: activo.numero_serie,
-      historial_trazabilidad: lineaDeTiempo
+      id_activo: idActivoReal,
+      nombre: activo.nombre_maquina,
+      serial: activo.numero_serie,
+      historial: lineaDeTiempo
     });
 
   } catch (error) {
-    console.error('Error en getTrazabilidadActivo:', error);
-    res.status(500).json({ error: "Hubo un error al generar la trazabilidad del activo" });
+    console.error('Error en trazabilidad:', error);
+    res.status(500).json({ error: "Error al generar la trazabilidad" });
   }
 };
 
-module.exports = { getActivos, getActivoPorId, crearActivo, actualizarActivo, darDeBajaActivo, getTrazabilidadActivo};
+module.exports = {
+  getActivos,
+  getActivoById,
+  crearActivo,
+  actualizarActivo,
+  darDeBajaActivo,
+  getTrazabilidadActivo
+};

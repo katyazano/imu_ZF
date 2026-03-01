@@ -1,25 +1,27 @@
-FROM node:22-alpine
+# 1. Cambiamos de 'alpine' a 'slim' para evitar problemas con OpenSSL y Prisma
+FROM node:18-slim
 
-# Instalar OpenSSL (Requerido por Prisma en Alpine Linux)
-RUN apk add --no-cache openssl
+# 2. Instalamos OpenSSL manualmente por si acaso Prisma lo necesita
+RUN apt-get update -y && apt-get install -y openssl
 
+# Crea el directorio de trabajo en el contenedor
 WORKDIR /app
 
-# 1. Copiar archivos de dependencias
+# Copia los archivos de dependencias
 COPY package*.json ./
 
-# 2. Instalar TODO (incluyendo prisma y @prisma/client)
+# Instala las dependencias
 RUN npm install
 
-# 3. Copiar configuración y esquema
+# Copia la carpeta de Prisma y genera el cliente
 COPY prisma ./prisma/
-
-# 4. Generar el cliente de Prisma
 RUN npx prisma generate
 
-# 5. Copiar el resto del código
+# Copia el resto del código del backend
 COPY . .
 
-EXPOSE 3000
+# Expone el puerto donde corre tu API
+EXPOSE 4000
 
-CMD ["node", "src/index.js"]
+# Comando para iniciar el servidor
+CMD ["npm", "start"]

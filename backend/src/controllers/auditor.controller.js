@@ -1,66 +1,104 @@
 const prisma = require('../services/prisma');
 const exceljs = require('exceljs');
-const fs = require('fs');
-const path = require('path');
 
 // ==========================================
-// 1. ENDPOINT: DASHBOARD KPIs
+// 1. ENDPOINT: DASHBOARD TRAZABILIDAD (NUEVO ENFOQUE)
 // ==========================================
-// Devuelve los totales matemáticos para las gráficas del Auditor
 const getDashboardKPIs = async (req, res) => {
   try {
-    // Validación de rol: Solo Admin, Gerente y Auditor pueden ver estos KPIs
-    const id_rol = req.usuario_token.id_rol;
-    if (![1, 3, 7].includes(id_rol)) { // Admin, Gerente, Auditor
-      return res.status(403).json({ error: "No tienes permiso para ver los KPIs." });
+    const { id: id_usuario, id_rol } = req.usuario_token; 
+
+    if (![1, 2, 3, 4, 6, 7].includes(id_rol)) { 
+      return res.status(403).json({ error: "No tienes permiso para ver el control de trazabilidad." });
     }
 
-    // 1. Contar el total de activos registrados
-    const total_activos = await prisma.activos.count();
+    const hoy = new Date();
+    const filtroGerente = id_rol === 3 ? { id_gerente_responsable: id_usuario } : {};
 
-    // 2. Contar cuántos están prestados actualmente
-    const prestados_actualmente = await prisma.activos.count({
-      where: {
-        estado_maquina: { id_estado_maquina: '3' }
+    const [totalActivos, solicitudesActivas] = await Promise.all([
+      prisma.activos.count({
+        where: filtroGerente 
+      }),
+      prisma.solicitudes.findMany({
+        where: {
+          activo: filtroGerente,
+          estatus_general: { in: ['Aprobada', 'En curso', 'Vencido'] }
+        },
+        include: {
+          activo: { select: { nombre_maquina: true } },
+          solicitante: { select: { nombre_completo: true } }
+        }
+      })
+    ]);
+
+    let devolucionesVencidas = 0;
+    let enTiempo = 0;
+    let infractoresSet = new Set();
+    let listaVencidos = [];
+    
+    // ✅ 1. RECUPERAMOS EL MAPA DE DESTINOS
+    let destinosMap = {};
+
+    solicitudesActivas.forEach(sol => {
+      // ✅ 2. CALCULAMOS LA CANTIDAD POR DESTINO PARA LA GRÁFICA
+      const nombreDestino = sol.tipo_salida || 'Asignación General';
+      destinosMap[nombreDestino] = (destinosMap[nombreDestino] || 0) + 1;
+
+      if (sol.fecha_devolucion_programada && new Date(sol.fecha_devolucion_programada) < hoy) {
+        devolucionesVencidas++;
+        infractoresSet.add(sol.id_usuario_solicitante);
+
+        const diffTime = Math.abs(hoy - new Date(sol.fecha_devolucion_programada));
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        listaVencidos.push({
+          id: sol.id_solicitud,
+          id_activo: sol.id_activo,
+          solicitante: sol.solicitante?.nombre_completo || 'Usuario Desconocido',
+          equipo: sol.activo?.nombre_maquina || 'Equipo sin nombre',
+          destino: nombreDestino,
+          dias_retraso: diffDays
+        });
+      } else {
+        enTiempo++;
       }
     });
 
-    // 3. Uso por disciplina (Agrupamos activos por ID de disciplina)
-    const activosPorDisciplina = await prisma.activos.groupBy({
-      by: ['id_disciplina'],
-      _count: { id_activo: true },
-    });
-
-    // Traemos el catálogo de áreas para mapear el ID al nombre real
-    const disciplinas = await prisma.disciplinas_areas.findMany();
-    
-    const uso_por_disciplina = {};
-    activosPorDisciplina.forEach(item => {
-      const nombreArea = disciplinas.find(d => d.id_disciplina === item.id_disciplina)?.nombre || 'Desconocida';
-      uso_por_disciplina[nombreArea] = item._count.id_activo;
-    });
+    // ✅ 3. FORMATEAMOS LOS DATOS COMO RECHARTS LOS PIDE (name y cantidad)
+    const equiposPorDestino = Object.keys(destinosMap).map(key => ({
+      name: key,
+      cantidad: destinosMap[key]
+    })).sort((a, b) => b.cantidad - a.cantidad);
 
     res.json({
-      total_activos,
-      prestados_actualmente,
-      uso_por_disciplina
+      kpis: {
+        equipos_fuera: solicitudesActivas.length,
+        devoluciones_vencidas: devolucionesVencidas,
+        usuarios_infractores: infractoresSet.size,
+        total_activos: totalActivos 
+      },
+      estatus: {
+        en_tiempo: enTiempo,
+        vencidos: devolucionesVencidas
+      },
+      // ✅ 4. ENVIAMOS LA PROPIEDAD AL FRONTEND
+      equipos_por_destino: equiposPorDestino,
+      lista_vencidos: listaVencidos
     });
 
   } catch (error) {
     console.error('Error en getDashboardKPIs:', error);
-    res.status(500).json({ status: 'error', mensaje: 'Error al calcular los KPIs' });
+    res.status(500).json({ status: 'error', mensaje: 'Error interno de servidor' });
   }
 };
 
 // ==========================================
 // 2. ENDPOINT: EQUIPOS VENCIDOS
 // ==========================================
-// Escanea solicitudes vencidas que no han sido devueltas a caseta 
 const getVencidos = async (req, res) => {
   try {
-    // Validación de rol: Solo Admin, Gerente, S&R y Auditor pueden ver estos KPIs
     const id_rol = req.usuario_token.id_rol;
-    if (![1, 3, 4, 7].includes(id_rol)) { // Admin, Gerente, S&R, Auditor
+    if (![1, 3, 4, 7].includes(id_rol)) { 
       return res.status(403).json({ error: "No tienes permiso para ver los vencidos." });
     }
 
@@ -77,7 +115,6 @@ const getVencidos = async (req, res) => {
       }
     });
 
-    // Calculamos los días exactos de retraso
     const vencidos = solicitudesVencidas.map(sol => {
       const fechaDevolucion = new Date(sol.fecha_devolucion_programada);
       const diferenciaTiempo = Math.abs(hoy - fechaDevolucion);
@@ -102,12 +139,10 @@ const getVencidos = async (req, res) => {
 // ==========================================
 // 3. ENDPOINT: HISTORIAL DE ALERTAS
 // ==========================================
-// Muestra el historial de quiénes han recibido más correos de infracción 
 const getAlertas = async (req, res) => {
   try {
-    // Validación de rol: Solo Admin y Auditor pueden ver el registro de alertas
     const id_rol = req.usuario_token.id_rol;
-    if (![1, 7].includes(id_rol)) { // Admin, Auditor
+    if (![1, 7].includes(id_rol)) { 
       return res.status(403).json({ error: "Solo Auditores y Admins pueden ver el registro de alertas." });
     }
 
@@ -138,25 +173,21 @@ const getAlertas = async (req, res) => {
 // ==========================================
 const exportarReportes = async (req, res) => {
   try {
-    // Validación de rol: Solo Admin, Gerente, S&R y Auditor pueden exportar reportes
     const id_rol = req.usuario_token.id_rol;
-    if (![1, 3, 4, 7].includes(id_rol)) { // Admin, Gerente, S&R, Auditor
+    if (![1, 3, 4, 7].includes(id_rol)) { 
       return res.status(403).json({ error: "No tienes permiso para exportar reportes." });
     }
 
-    // 1. Ahora leemos las fechas desde la URL (query parameters) en lugar del body
     const { fecha_inicio, fecha_fin } = req.query;
 
     const whereClause = {};
     if (fecha_inicio && fecha_fin){
-      // Forzamos el inicio y fin del día para que Prisma busque correctamente
       whereClause.fecha_creacion = {
         gte: new Date(`${fecha_inicio}T00:00:00.000Z`),
         lte: new Date(`${fecha_fin}T23:59:59.999Z`)
       };
     }
     
-    // 2. Traemos los datos de la base de datos
     const historial = await prisma.solicitudes.findMany({
       where: whereClause,
       include: {
@@ -165,7 +196,6 @@ const exportarReportes = async (req, res) => {
       }
     });
 
-    // 3. Armamos la estructura del Excel
     const workbook = new exceljs.Workbook();
     const worksheet = workbook.addWorksheet('Historial de Préstamos');
 
@@ -178,13 +208,10 @@ const exportarReportes = async (req, res) => {
       { header: 'Estatus', key: 'estatus', width: 15 }
     ];
 
-    // Damos estilo azul marino corporativo a los encabezados
     worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
     worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF003366' } };
 
-    // 4. Llenamos las filas
     historial.forEach(registro => {
-      // Blindaje: Si no hay fecha, ponemos 'N/A' en lugar de que el código explote
       let fechaFormateada = 'N/A';
       if (registro.fecha_devolucion_programada) {
         fechaFormateada = new Date(registro.fecha_devolucion_programada).toISOString().split('T')[0];
@@ -200,14 +227,11 @@ const exportarReportes = async (req, res) => {
       });
     });
 
-    // 5. Generamos el archivo en memoria (Buffer)
     const buffer = await workbook.xlsx.writeBuffer();
 
-    // 6. Mandamos las cabeceras exactas para que el navegador sepa que es un Excel
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="Reporte_Auditoria_ZF.xlsx"');
     
-    // 7. Entregamos el archivo
     return res.send(buffer);
 
   } catch (error) {
@@ -221,20 +245,15 @@ const exportarReportes = async (req, res) => {
 // ==========================================
 const getHistorialWeb = async (req, res) => {
   try {
-    // Validación de rol: Solo Admin, Gerente, S&R y Auditor pueden ver el historial en web
     const id_rol = req.usuario_token.id_rol;
     if (![1, 3, 4, 7].includes(id_rol)) { 
       return res.status(403).json({ error: "No tienes permiso para ver el historial." });
     }
 
-    // 1. Leer en qué página estamos y cuántos registros queremos (Por defecto: página 1, de 10 en 10)
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-    
-    // 2. Calcular cuántos registros saltarnos
     const skip = (page - 1) * limit;
 
-    // 3. Hacer 2 consultas al mismo tiempo: Contar el total y traer el pedazo de datos
     const [totalRegistros, historial] = await Promise.all([
       prisma.solicitudes.count(),
       prisma.solicitudes.findMany({
@@ -248,7 +267,6 @@ const getHistorialWeb = async (req, res) => {
       })
     ]);
 
-    // 4. Mapear los datos
     const datosPantalla = historial.map(registro => ({
       id_solicitud: registro.id_solicitud,
       solicitante: registro.solicitante?.nombre_completo || 'Sin nombre',
@@ -258,7 +276,6 @@ const getHistorialWeb = async (req, res) => {
       estatus: registro.estatus_general
     }));
 
-    // 5. Entregar la respuesta con la "metadata" para que React dibuje los botones de [Anterior] y [Siguiente]
     res.json({
       metadata: {
         total_registros: totalRegistros,
@@ -274,10 +291,102 @@ const getHistorialWeb = async (req, res) => {
   }
 };
 
+// ==========================================
+// 6. ENDPOINT: TRAZABILIDAD DE UN ACTIVO (HISTORIAL COMPLETO)
+// ==========================================
+const getTrazabilidadActivo = async (req, res) => {
+  try {
+    const id_rol = req.usuario_token.id_rol;
+    if (![1, 2, 3, 7].includes(id_rol)) { 
+      return res.status(403).json({ error: "No tienes permiso para ver la trazabilidad." });
+    }
+
+    const { id } = req.params;
+    const idActivo = parseInt(id);
+
+    if (isNaN(idActivo)) {
+      return res.status(400).json({ error: "ID de activo inválido." });
+    }
+
+    const activoFisico = await prisma.activos.findUnique({
+      where: { id_activo: idActivo },
+      include: { estado_maquina: true }
+    });
+
+    if (!activoFisico) {
+      return res.status(404).json({ error: "No se encontró el activo solicitado." });
+    }
+
+    const solicitudes = await prisma.solicitudes.findMany({
+      where: { id_activo: idActivo },
+      include: { solicitante: true },
+    });
+
+    const mantenimientos = await prisma.mantenimientos_incidencias.findMany({
+      where: { id_activo: idActivo },
+      include: { reportador: true }
+    });
+
+    let historialCrudo = [];
+
+    if (activoFisico.fecha_compra) {
+      historialCrudo.push({
+        tipo: 'ADQUISICIÓN',
+        detalle: `Registrado en sistema. Marca: ${activoFisico.marca || 'N/A'}`,
+        fechaReal: new Date(activoFisico.fecha_compra)
+      });
+    }
+
+    solicitudes.forEach(sol => {
+      historialCrudo.push({
+        tipo: `PRÉSTAMO - ${sol.estatus_general.toUpperCase()}`,
+        detalle: `A: ${sol.solicitante?.nombre_completo || 'Usuario desconocido'}`,
+        fechaReal: new Date(sol.fecha_creacion)
+      });
+    });
+
+    mantenimientos.forEach(mant => {
+      historialCrudo.push({
+        tipo: `MANTENIMIENTO - ${mant.estatus_reparacion.toUpperCase()}`,
+        detalle: mant.descripcion,
+        fechaReal: new Date(mant.fecha_reporte)
+      });
+    });
+
+    historialCrudo.sort((a, b) => b.fechaReal - a.fechaReal);
+
+    const historialFinal = historialCrudo.map(item => {
+      const dia = String(item.fechaReal.getDate()).padStart(2, '0');
+      const mes = String(item.fechaReal.getMonth() + 1).padStart(2, '0');
+      const anio = item.fechaReal.getFullYear();
+      
+      return {
+        tipo: item.tipo,
+        detalle: item.detalle,
+        fecha: `${dia}/${mes}/${anio}`
+      };
+    });
+
+    res.json({
+      activo: {
+        id_activo: activoFisico.id_activo,
+        nombre_maquina: activoFisico.nombre_maquina,
+        estado: activoFisico.estado_maquina?.nombre || 'Desconocido'
+      },
+      historial: historialFinal
+    });
+
+  } catch (error) {
+    console.error('Error en getTrazabilidadActivo:', error);
+    res.status(500).json({ status: 'error', mensaje: 'Error al obtener la trazabilidad del activo' });
+  }
+};
+
 module.exports = {
   getDashboardKPIs,
   getVencidos,
   getAlertas,
   exportarReportes,
-  getHistorialWeb
+  getHistorialWeb,
+  getTrazabilidadActivo
 };

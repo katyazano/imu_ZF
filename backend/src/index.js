@@ -4,6 +4,8 @@ const cors = require('cors');
 
 const app = express();
 
+require('./services/cron.service');
+
 // Middlewares globales
 app.use(express.json()); // Vital para leer los { body } que mande React
 app.use(cors());
@@ -21,6 +23,7 @@ const aprobacionesRoutes = require('./routes/aprobaciones.routes');
 const reglasRoutes = require('./routes/reglas.routes');
 const usuariosRoutes = require('./routes/usuarios.routes');
 const auditorRoutes = require('./routes/auditor.routes')
+const notificacionesRoutes = require('./routes/notificaciones.routes');
 
 // ==========================================
 // MONTAJE DE ENDPOINTS
@@ -34,7 +37,9 @@ app.use('/api/bitacora', bitacoraRoutes);              // Módulo 4
 app.use('/api/mantenimientos', mantenimientosRoutes);  // Módulo 4
 app.use('/api/usuarios', usuariosRoutes);              // Módulo 5
 app.use('/api/reglas', reglasRoutes);                  // Módulo 6
-app.use('/api', auditorRoutes);                        // Módulo 7
+app.use('/api/auditor', auditorRoutes);              // Módulo 7
+app.use('/api/notificaciones', notificacionesRoutes);  // Módulo Notificaciones
+
 
 // Endpoint de prueba rápida
 app.get('/', (req, res) => {
