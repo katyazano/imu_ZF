@@ -1,7 +1,5 @@
 # 🛡️ ZF Halo - Sistema Inteligente de Trazabilidad de Activos
 
-![ZF Logo](https://upload.wikimedia.org/wikipedia/commons/thumb/1/13/ZF_Friedrichshafen_logo.svg/512px-ZF_Friedrichshafen_logo.svg.png)
-
 > **Modernizando la logística interna.** Una plataforma integral (PWA) para el rastreo, asignación, mantenimiento y control de préstamos de equipo especializado en planta.
 
 [![React](https://img.shields.io/badge/Frontend-React_18-61DAFB?logo=react)](https://reactjs.org/)
@@ -73,10 +71,39 @@ Si deseas probar el proyecto en un entorno local, sigue estos pasos:
 ### Prerrequisitos
 * Node.js (v18 o superior)
 * Git
+* Docker Dektop
 
 ### Pasos
-
 1. **Clonar el repositorio**
    ```bash
    git clone [https://github.com/tu-usuario/zf-halo.git](https://github.com/tu-usuario/zf-halo.git)
    cd zf-halo
+
+2. **Configurar variables de entono**
+   1. Navegue a la carpeta del servidor: `cd backend`
+   2. Cree un archivo llamado `.env` y pegue lo siguiente:
+   ```env
+   # URL de conexión a la base de datos (PostgreSQL)
+   # IMPORTANTE: Si su contraseña contiene caracteres especiales como @ o $, 
+   # debe usar URL Encoding (ej. @ = %40, $ = %24)
+   DATABASE_URL="postgresql://postgres.USUARIO:PASSWORD@host:puerto/postgres?connect_timeout=10"
+
+   # Secreto para la generación de Tokens JWT
+   JWT_SECRET="mi_firma_secreta_zf_halo_2026"
+
+   # Clave para validación de Captcha (Opcional en desarrollo)
+   CAPTCHA_SECRET_KEY="6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe"
+
+3. **Construcción e Inicio**
+   1. Desde la raíz del proyecto
+   ```bash
+   docker-compose up --build
+
+4. **Acceso al Sistema**
+   Una vez que la terminal indique que los contenedores están listos, puede acceder a través de:
+
+   🌐 Frontend (Aplicación PWA): http://localhost:5173
+
+   ⚙️ Backend (API REST): http://localhost:4000
+
+### Desarrollado para la competencia IMU 2026 💙
