@@ -10,4 +10,7 @@ router.get('/pendientes', aprobacionesController.getFirmasPendientes);
 
 router.patch('/dictaminar/:id_firma', aprobacionesController.dictaminarFirma);
 
+// Endpoint para obtener el panel de logística
+router.get('/logistica/historial', aprobacionesController.getPanelLogistica);
+
 module.exports = router;

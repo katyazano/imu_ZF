@@ -3,18 +3,19 @@ import { ChevronRight } from 'lucide-react';
 
 // --- NOTA PARA BACKEND: Este componente recibe un objeto 'n' con los datos de la notificación ---
 const CardNotificacion = ({ n }) => {
-  return (
-    <div 
-      className={`flex items-start gap-4 p-5 rounded-[25px] border-2 shadow-sm animate-in slide-in-from-right duration-300 transition-all active:scale-[0.98] ${n.color}`}
-    >
-      <div className="mt-1">{n.icon}</div>
-      <div className="flex-1">
-        <h3 className="font-extrabold text-gray-900 leading-tight">{n.titulo}</h3>
-        <p className="text-sm text-gray-600 mt-1 leading-snug font-medium">{n.descripcion}</p>
-      </div>
-      <ChevronRight size={20} className="text-gray-300 self-center" />
+  // ✅ DESPUÉS (Limpio y listo para tu nueva "X")
+return (
+  <div className={`p-4 rounded-xl flex gap-4 pr-10 ${n.color}`}>
+    <div className="bg-white p-2 rounded-full h-fit shadow-sm">
+      {n.icon}
     </div>
-  );
+    <div className="flex-1">
+      <h3 className="font-bold text-gray-900">{n.titulo}</h3>
+      <p className="text-sm text-gray-700 mt-1">{n.descripcion}</p>
+      <span className="text-xs text-gray-400 mt-2 block">{n.fecha}</span>
+    </div>
+  </div>
+);
 };
 
 export default CardNotificacion;

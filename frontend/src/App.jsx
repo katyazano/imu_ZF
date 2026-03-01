@@ -54,7 +54,7 @@ const RutaProtegida = ({ children, rolesPermitidos }) => {
       2: '/categorias',       
       3: '/gerenteDashboard', 
       4: '/shipping-control',
-      5: '/approval',
+      5: '/ehsDashboard',
       6: '/scanner',          
       7: '/auditorDashboard'  
     };
@@ -85,14 +85,14 @@ function App() {
         <Route path="/perfil" element={<RutaProtegida><Perfil /></RutaProtegida>} />
         <Route path="/nuevo-activo" element={<RutaProtegida rolesPermitidos={[1,3]}><NuevoActivo /></RutaProtegida>} />
         <Route path="/editar-activo/:id" element={<RutaProtegida rolesPermitidos={[1,3]}><EditarActivo /></RutaProtegida>} />
-        <Route path="/scanner" element={<RutaProtegida rolesPermitidos={[1, 2, 3, 6, 7]}><Scanner /></RutaProtegida>} />
+        <Route path="/scanner" element={<RutaProtegida rolesPermitidos={[1, 2, 3, 4, 5, 6, 7]}><Scanner /></RutaProtegida>} />
 
         {/* ========================================== */}
         {/* 👑 RUTAS DE ADMINISTRADOR (Rol 1)          */}
         {/* ========================================== */}
         <Route path="/adminDashboard" element={<RutaProtegida rolesPermitidos={[1]}><AdminDashboard /></RutaProtegida>} />
         <Route path="/admin-mantenimiento" element={<RutaProtegida rolesPermitidos={[1]}><AdminMantenimiento /></RutaProtegida>} />
-        <Route path="/prestamos-activos" element={<RutaProtegida rolesPermitidos={[1]}><PrestamosActivos /></RutaProtegida>} />
+        <Route path="/prestamos-activos" element={<RutaProtegida rolesPermitidos={[1, 3,, 4, 7]}><PrestamosActivos /></RutaProtegida>} />
         <Route path="/firmas" element={<RutaProtegida rolesPermitidos={[1]}><GestionarFirmas /></RutaProtegida>} />
         <Route path="/admin-usuarios" element={<RutaProtegida rolesPermitidos={[1]}><GestionUsuarios /></RutaProtegida>} />
         
@@ -121,7 +121,7 @@ function App() {
         {/* ========================================== */}
         {/* ⚠️ OTRAS RUTAS ESPECIALIZADAS              */}
         {/* ========================================== */}
-        <Route path="/approval" element={<RutaProtegida rolesPermitidos={[1, 5]}><RiskApproval /></RutaProtegida>} />
+        <Route path="/ehsDashboard" element={<RutaProtegida rolesPermitidos={[1, 5]}><RiskApproval /></RutaProtegida>} />
         <Route path="/shipping-control" element={<RutaProtegida rolesPermitidos={[1, 4]}><ShippingControl /></RutaProtegida>} />
 
         {/* Redirección Catch-All */}

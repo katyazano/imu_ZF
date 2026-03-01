@@ -1,42 +1,68 @@
 const prisma = require('../services/prisma');
 
+// ==========================================
+// 1. OBTENER FIRMAS (CON FILTRO SECUENCIAL PARA S&R)
+// ==========================================
 const getFirmasPendientes = async (req, res) => {
   try {
     const mi_id = req.usuario_token.id;
     const mi_rol = req.usuario_token.id_rol;
 
-    // 1. Buscamos si alguien me dejó como su suplente
     const usuariosAQuienesSuplo = await prisma.usuarios.findMany({
       where: { id_suplente: mi_id, activo: true },
       select: { id_rol: true }
     });
 
-    // 2. Armamos la lista de roles que tengo derecho a firmar
     const roles_autorizados = [mi_rol]; 
     usuariosAQuienesSuplo.forEach(u => roles_autorizados.push(u.id_rol));
 
-    // 3. Buscamos TODAS las firmas pendientes para esos roles
     const firmas = await prisma.aprobaciones_firma.findMany({
       where: {
-        id_rol_esperado: { in: roles_autorizados }, // <-- MAGIA: Busca en un arreglo
-        estatus_firma: 'Pendiente'
+        id_rol_esperado: { in: roles_autorizados }, 
+        estatus_firma: 'Pendiente',
+        solicitud: {
+          // No mostramos nada que ya esté cancelado, rechazado o en tránsito
+          estatus_general: { notIn: ['Cancelada', 'Rechazada', 'En Tránsito'] } 
+        }
       },
       include: {
         solicitud: {
           include: {
-            activo: { select: { nombre_maquina: true } },
-            solicitante: { select: { nombre_completo: true } }
+            activo: { select: { id_activo: true, nombre_maquina: true } },
+            solicitante: { select: { nombre_completo: true } },
+            destino: true,
+            // 👇 CLAVE: Traemos todas las firmas de la solicitud para revisarlas
+            firmas: { select: { id_firma: true, estatus_firma: true } } 
           }
         }
       }
     });
 
-    const respuesta = firmas.map(f => ({
+    // 🚨 FILTRO INTELIGENTE: S&R (Rol 4) solo ve la solicitud si NADIE MÁS falta por firmar
+    const firmasFiltradas = firmas.filter(f => {
+      if (f.id_rol_esperado === 4) {
+        const faltanOtrasFirmas = f.solicitud.firmas.some(
+          otraFirma => otraFirma.id_firma !== f.id_firma && otraFirma.estatus_firma === 'Pendiente'
+        );
+        return !faltanOtrasFirmas; // Si faltan otras (ej. Gerente o EHS), se oculta para S&R
+      }
+      return true; // Para los demás roles (Gerentes, EHS), se muestra normal
+    });
+
+    const respuesta = firmasFiltradas.map(f => ({
       id_firma: f.id_firma,
-      rol_esperado_id: f.id_rol_esperado, // Útil para que el front sepa "con qué sombrero" firmas
+      rol_esperado_id: f.id_rol_esperado, 
       solicitud: {
         id_solicitud: f.solicitud.id_solicitud,
-        activo: { nombre_maquina: f.solicitud.activo?.nombre_maquina || "N/A" },
+        tipo_salida: f.solicitud.tipo_salida, 
+        comentarios: f.solicitud.comentarios, 
+        metodo_transporte: f.solicitud.metodo_transporte,
+        fecha_salida_programada: f.solicitud.fecha_salida_programada,
+        activo: { 
+           id_activo: f.solicitud.activo?.id_activo,
+           nombre_maquina: f.solicitud.activo?.nombre_maquina || "N/A" 
+        },
+        destino: f.solicitud.destino,
         solicitante: { nombre_completo: f.solicitud.solicitante?.nombre_completo || "Desconocido" }
       }
     }));
@@ -48,12 +74,15 @@ const getFirmasPendientes = async (req, res) => {
   }
 };
 
+// ==========================================
+// 2. DICTAMINAR FIRMA (CON INTERCEPTOR DE ESTATUS DE MÁQUINA)
+// ==========================================
 const dictaminarFirma = async (req, res) => {
   try {
     const id_firma = parseInt(req.params.id_firma);
     const { estatus_firma, comentarios } = req.body;
     
-    const mi_id = req.usuario_token.id; // Extraemos MI ID
+    const mi_id = req.usuario_token.id;
     const mi_rol = req.usuario_token.id_rol;
 
     const firmaExistente = await prisma.aprobaciones_firma.findUnique({
@@ -63,11 +92,8 @@ const dictaminarFirma = async (req, res) => {
 
     if (!firmaExistente) return res.status(404).json({ error: "Firma no encontrada" });
 
-    // 2. SEGURIDAD INTELIGENTE
-    // Tengo permiso si es mi rol, O SI SOY ADMIN (id_rol === 1)
     let tengoPermiso = (firmaExistente.id_rol_esperado === mi_rol || mi_rol === 1);
 
-    // Si no es mi rol natural, checo si soy suplente de alguien con ese rol
     if (!tengoPermiso) {
       const supliendoA = await prisma.usuarios.findFirst({
         where: { id_suplente: mi_id, id_rol: firmaExistente.id_rol_esperado, activo: true }
@@ -79,51 +105,54 @@ const dictaminarFirma = async (req, res) => {
       return res.status(403).json({ error: "Tu rol no tiene permiso para aplicar esta firma." });
     }
 
-    // ==========================================
-    // NUEVO CANDADO: Evitar firmar solicitudes "muertas"
-    // ==========================================
     if (firmaExistente.solicitud.estatus_general === 'Cancelada' || firmaExistente.solicitud.estatus_general === 'Rechazada') {
       return res.status(400).json({ 
         error: `Operación denegada. Esta solicitud se encuentra ${firmaExistente.solicitud.estatus_general}.` 
       });
     }
 
-    // 3. PROCESO DE DICTAMEN (Transacción)
     const resultado = await prisma.$transaction(async (tx) => {
       
-      // A) Actualizamos la firma y REGISTRAMOS QUIÉN FIRMÓ 🕵️‍♀️
-      const firmaActualizada = await tx.aprobaciones_firma.update({
+      await tx.aprobaciones_firma.update({
         where: { id_firma },
         data: { 
           estatus_firma, 
           comentarios,
           fecha_firma: new Date(),
-          id_usuario_firmo: mi_id // <-- CRÍTICO PARA AUDITORÍA
+          id_usuario_firmo: mi_id 
         }
+      });
+
+      const todasLasFirmas = await tx.aprobaciones_firma.findMany({
+        where: { id_solicitud: firmaExistente.id_solicitud }
       });
 
       let estatus_general = firmaExistente.solicitud.estatus_general;
 
-      // B) Lógica de Negocio: Si rechazan una, se rechaza toda la solicitud
-      if (estatus_firma === 'Rechazada') {
-        estatus_general = 'Rechazada';
-      } else {
-        // C) Si aprueban, checamos si faltan más firmas por aprobar
-        const firmasRestantes = await tx.aprobaciones_firma.count({
-          where: {
-            id_solicitud: firmaExistente.id_solicitud,
-            estatus_firma: 'Pendiente',
-            id_firma: { not: id_firma } // Excluimos la que estamos firmando ahorita
-          }
-        });
+      const algunaRechazada = todasLasFirmas.some(f => f.estatus_firma === 'Rechazada');
+      const todasAprobadas = todasLasFirmas.every(f => f.estatus_firma === 'Aprobada');
 
-        // Si ya no hay pendientes, la solicitud completa pasa a 'Aprobada'
-        if (firmasRestantes === 0) {
-          estatus_general = 'Aprobada';
-        }
+      if (algunaRechazada) {
+        estatus_general = 'Rechazada';
+      } else if (todasAprobadas) {
+        estatus_general = 'Aprobada'; 
+      } else {
+        estatus_general = 'Pendiente';
       }
 
-      // D) Actualizamos el estatus general de la solicitud si hubo cambios
+      // 🚨 INTERCEPTADOR S&R: CAMBIAR MÁQUINA Y SOLICITUD AL SALIR 🚨
+      if (firmaExistente.id_rol_esperado === 4 && estatus_firma === 'Aprobada') {
+        
+        // 1. Cambiamos el estado físico de la máquina a "Prestada" (ID 3)
+        await tx.activos.update({
+          where: { id_activo: firmaExistente.solicitud.id_activo },
+          data: { id_estado_maquina: 3 }
+        });
+
+        // 2. Forzamos la solicitud a "En Tránsito"
+        estatus_general = 'En Tránsito';
+      }
+
       const solicitudActualizada = await tx.solicitudes.update({
         where: { id_solicitud: firmaExistente.id_solicitud },
         data: { estatus_general }
@@ -140,5 +169,74 @@ const dictaminarFirma = async (req, res) => {
   }
 };
 
+// NUEVA FUNCIÓN: Trae el panel completo para Logística
+const getPanelLogistica = async (req, res) => {
+  try {
+    // Buscamos TODAS las firmas asignadas a Logística (Rol 4)
+    const firmas = await prisma.aprobaciones_firma.findMany({
+      where: { id_rol_esperado: 4 },
+      orderBy: { id_firma: 'desc' }, // Las más recientes primero
+      include: {
+        solicitud: {
+          include: {
+            // 👇 1. CORRECCIÓN: Agregamos qr_codigo para el escáner 👇
+            activo: { select: { nombre_maquina: true, qr_codigo: true } }, 
+            solicitante: { select: { nombre_completo: true } },
+            destino: true,
+            firmas: { select: { id_firma: true, estatus_firma: true } }
+          }
+        }
+      }
+    });
 
-module.exports = { getFirmasPendientes, dictaminarFirma };
+    // 👇 2. CORRECCIÓN: Filtro Inteligente para ocultar lo que aún no es turno de S&R 👇
+    const firmasFiltradas = firmas.filter(f => {
+      // Si la firma de Logística sigue "Pendiente", revisamos si faltan otros por firmar
+      if (f.estatus_firma === 'Pendiente') {
+        const faltanOtrasFirmas = f.solicitud.firmas.some(
+          otraFirma => otraFirma.id_firma !== f.id_firma && otraFirma.estatus_firma === 'Pendiente'
+        );
+        // Si falta el Gerente o EHS, ocultamos la tarjeta para Logística
+        return !faltanOtrasFirmas; 
+      }
+      // Si la firma ya fue Aprobada o Rechazada por Logística, la mostramos para su historial
+      return true; 
+    });
+
+    const respuesta = firmasFiltradas.map(f => {
+      // LÓGICA DE PESTAÑAS BASADA EN LA BASE DE DATOS REAL
+      let estadoPestana = 'Pendientes de envío';
+      
+      if (f.estatus_firma === 'Aprobada' && f.solicitud.estatus_general === 'En Tránsito') {
+        estadoPestana = 'En tránsito';
+      } else if (f.estatus_firma === 'Rechazada' || f.solicitud.estatus_general === 'Rechazada') {
+        estadoPestana = 'Devueltos';
+      } else if (f.estatus_firma === 'Aprobada' && f.solicitud.estatus_general === 'Aprobada') {
+        estadoPestana = 'En tránsito'; 
+      }
+
+      return {
+        id_firma: f.id_firma,
+        id_solicitud: f.solicitud.id_solicitud,
+        folio: `SF-${f.solicitud.id_solicitud.toString().padStart(4, '0')}`,
+        solicitante: f.solicitud.solicitante.nombre_completo,
+        nombre_maquina: f.solicitud.activo.nombre_maquina,
+        qr_codigo: f.solicitud.activo.qr_codigo, // 👈 Se manda al Front para el escáner
+        destino: f.solicitud.destino?.nombre_institucion || 'Destino Interno',
+        tipo_salida: f.solicitud.tipo_salida,
+        metodo_transporte: f.solicitud.metodo_transporte || 'Por definir',
+        fecha_salida: f.solicitud.fecha_salida_programada 
+           ? new Date(f.solicitud.fecha_salida_programada).toLocaleDateString() 
+           : 'Sin fecha',
+        estado: estadoPestana 
+      };
+    });
+
+    res.status(200).json(respuesta);
+  } catch (error) {
+    console.error("Error en getPanelLogistica:", error);
+    res.status(500).json({ error: "Error al cargar el panel de logística" });
+  }
+};
+
+module.exports = { getFirmasPendientes, dictaminarFirma, getPanelLogistica };
