@@ -46,16 +46,24 @@ const crearSolicitud = async (req, res) => {
         regla = { requiere_gerente: true, requiere_syr: false, requiere_ehs: false };
       }
 
-      if (regla.requiere_gerente) {
-        firmasRequeridas.push({ id_rol_esperado: 3, estatus_firma: "Pendiente" });
-      }
+      const esScrap = tipo_salida && tipo_salida.toLowerCase().includes('scrap');
 
-      if (regla.requiere_syr) {
-        firmasRequeridas.push({ id_rol_esperado: 4, estatus_firma: "Pendiente" });
-      }
-
-      if (regla.requiere_ehs || (tipo_salida && tipo_salida.toLowerCase() === 'Scrap')) {
-        firmasRequeridas.push({ id_rol_esperado: 5, estatus_firma: "Pendiente" });
+      if (esScrap) {
+        // El Scrap ignora las reglas base y fuerza el cumplimiento total (Triple Firma)
+        firmasRequeridas.push({ id_rol_esperado: 3, estatus_firma: "Pendiente" }); // Gerente Responsable
+        firmasRequeridas.push({ id_rol_esperado: 4, estatus_firma: "Pendiente" }); // Logística (S&R)
+        firmasRequeridas.push({ id_rol_esperado: 5, estatus_firma: "Pendiente" }); // Riesgo (EHS)
+      } else {
+        // Flujo normal regido por el panel de control del Administrador
+        if (regla.requiere_gerente) {
+          firmasRequeridas.push({ id_rol_esperado: 3, estatus_firma: "Pendiente" });
+        }
+        if (regla.requiere_syr) {
+          firmasRequeridas.push({ id_rol_esperado: 4, estatus_firma: "Pendiente" });
+        }
+        if (regla.requiere_ehs) {
+          firmasRequeridas.push({ id_rol_esperado: 5, estatus_firma: "Pendiente" });
+        }
       }
     }
 
