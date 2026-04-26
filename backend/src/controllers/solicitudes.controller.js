@@ -3,79 +3,74 @@ const prisma = require('../services/prisma');
 
 const crearSolicitud = async (req, res) => {
   try {
-    // 1. Extraemos ID y Rol del token (inyectado por tu middleware de auth)
     const id_usuario_solicitante = req.usuario_token.id;
-    const id_rol_usuario = req.usuario_token.id_rol; // 👈 Clave para la lógica bimodal
+    const id_rol_usuario = req.usuario_token.id_rol; 
 
     const { 
-      id_activo, 
-      tipo_salida, 
-      fecha_salida_programada, 
-      fecha_devolucion_programada, 
-      id_destino, // Este es el id_proyecto de centros_costo_proyectos
-      metodo_transporte 
+      id_activo, tipo_salida, fecha_salida_programada, 
+      fecha_devolucion_programada, id_destino, metodo_transporte 
     } = req.body;
 
-    // 2. Buscamos el activo
     const activo = await prisma.activos.findUnique({
       where: { id_activo: parseInt(id_activo) }
     });
 
-    if (!activo) {
-      return res.status(404).json({ error: "El activo solicitado no existe." });
-    }
+    if (!activo) return res.status(404).json({ error: "El activo solicitado no existe." });
+    if (activo.id_estado_maquina !== 1) return res.status(400).json({ error: "Este equipo no está disponible para préstamo o asignación." });
 
-    // Validamos disponibilidad (1 = Operativa/Disponible)
-    if (activo.id_estado_maquina !== 1) { 
-      return res.status(400).json({ error: "Este equipo no está disponible para préstamo o asignación." });
-    }
-
-    // 🔍 DETERMINAR FLUJO POR ROL
-    const esAdmin = id_rol_usuario === 1; // Suponiendo que 1 es Admin en tu DB
+    const esAdmin = id_rol_usuario === 1; 
     const estatusGeneral = esAdmin ? "Aprobada" : "Pendiente";
-    const nuevoEstadoActivo = esAdmin ? 3 : 4; // 3 = Prestada (Directo), 4 = En proceso de préstamo
+    const nuevoEstadoActivo = esAdmin ? 3 : 4; 
 
-    // 3. Lógica de firmas (Solo si NO es admin)
     let firmasRequeridas = [];
+    
     if (!esAdmin) {
       let regla = await prisma.reglas_aprobacion.findUnique({
         where: { id_categoria: activo.id_categoria }
       });
 
-      if (!regla) {
-        regla = { requiere_gerente: true, requiere_syr: false, requiere_ehs: false };
-      }
+      if (!regla) regla = { requiere_gerente: true, requiere_syr: false, requiere_ehs: false };
+
+      // refactor: buscamos cuántos gerentes dueños tiene este activo
+      const dueños = await prisma.activos_responsables.findMany({
+        where: { id_activo: parseInt(id_activo) }
+      });
+
+      // función inyectora dinámica para crear "N" firmas
+      const inyectarFirmasGerentes = () => {
+        if (dueños.length > 0) {
+          dueños.forEach(dueño => {
+            firmasRequeridas.push({ 
+              id_rol_esperado: 3, 
+              id_usuario_esperado: dueño.id_usuario, 
+              estatus_firma: "Pendiente" 
+            });
+          });
+        } else {
+          // fallback de seguridad si un activo no tiene dueño asignado
+          firmasRequeridas.push({ id_rol_esperado: 3, estatus_firma: "Pendiente" });
+        }
+      };
 
       const esScrap = tipo_salida && tipo_salida.toLowerCase().includes('scrap');
 
       if (esScrap) {
-        // El Scrap ignora las reglas base y fuerza el cumplimiento total (Triple Firma)
-        firmasRequeridas.push({ id_rol_esperado: 3, estatus_firma: "Pendiente" }); // Gerente Responsable
-        firmasRequeridas.push({ id_rol_esperado: 4, estatus_firma: "Pendiente" }); // Logística (S&R)
-        firmasRequeridas.push({ id_rol_esperado: 5, estatus_firma: "Pendiente" }); // Riesgo (EHS)
+        inyectarFirmasGerentes(); // agrega a todos los dueños
+        firmasRequeridas.push({ id_rol_esperado: 4, estatus_firma: "Pendiente" }); 
+        firmasRequeridas.push({ id_rol_esperado: 5, estatus_firma: "Pendiente" }); 
       } else {
-        // Flujo normal regido por el panel de control del Administrador
-        if (regla.requiere_gerente) {
-          firmasRequeridas.push({ id_rol_esperado: 3, estatus_firma: "Pendiente" });
-        }
-        if (regla.requiere_syr) {
-          firmasRequeridas.push({ id_rol_esperado: 4, estatus_firma: "Pendiente" });
-        }
-        if (regla.requiere_ehs) {
-          firmasRequeridas.push({ id_rol_esperado: 5, estatus_firma: "Pendiente" });
-        }
+        if (regla.requiere_gerente) inyectarFirmasGerentes(); // agrega a todos los dueños
+        if (regla.requiere_syr) firmasRequeridas.push({ id_rol_esperado: 4, estatus_firma: "Pendiente" });
+        if (regla.requiere_ehs) firmasRequeridas.push({ id_rol_esperado: 5, estatus_firma: "Pendiente" });
       }
     }
 
-    // 4. TRANSACCIÓN ATÓMICA
     const nuevaSolicitud = await prisma.$transaction(async (tx) => {
-      
-      // A. Crear la Solicitud
       const solicitud = await tx.solicitudes.create({
         data: {
           id_activo: parseInt(id_activo),
           id_usuario_solicitante: id_usuario_solicitante,
-          id_destino: id_destino ? parseInt(id_destino) : null, // Vinculado a centros_costo_proyectos
+          id_destino: id_destino ? parseInt(id_destino) : null,
           tipo_salida: tipo_salida || (esAdmin ? "Asignacion Directa" : "Prestamo"),
           estatus_general: estatusGeneral,
           fecha_salida_programada: fecha_salida_programada ? new Date(fecha_salida_programada) : new Date(),
@@ -84,7 +79,6 @@ const crearSolicitud = async (req, res) => {
         }
       });
 
-      // B. Crear Firmas (Solo si hay firmas y NO es admin)
       if (firmasRequeridas.length > 0) {
         const firmasData = firmasRequeridas.map(firma => ({
           ...firma,
@@ -93,7 +87,6 @@ const crearSolicitud = async (req, res) => {
         await tx.aprobaciones_firma.createMany({ data: firmasData });
       }
 
-      // C. Actualizar Estado del Activo
       await tx.activos.update({
         where: { id_activo: parseInt(id_activo) },
         data: { id_estado_maquina: nuevoEstadoActivo } 
@@ -319,28 +312,34 @@ const getSolicitudPorId = async (req, res) => {
       return res.status(404).json({ error: "Solicitud no encontrada" });
     }
 
+// refactor: consolidar firmas múltiples de Gerentes en un solo estado para React
+    const firmasGerentes = solicitud.firmas.filter(f => f.id_rol_esperado === 3);
+    
+    let estatusGerenteFinal = 'Pendiente';
+    if (firmasGerentes.length > 0) {
+      if (firmasGerentes.some(f => f.estatus_firma === 'Rechazada')) {
+        estatusGerenteFinal = 'Rechazada'; // Si uno rechaza, se rechaza
+      } else if (firmasGerentes.every(f => f.estatus_firma === 'Aprobada')) {
+        estatusGerenteFinal = 'Aprobada';  // Deben aprobar todos para estar Aprobada
+      }
+    }
+
     // Formateamos la respuesta 
     const respuestaFormateada = {
       id_solicitud: solicitud.id_solicitud,
       estatus_general: solicitud.estatus_general,
-      
-      // AGREGAMOS LOS CAMPOS LOGÍSTICOS QUE FALTABAN
       tipo_salida: solicitud.tipo_salida,
       fecha_salida_programada: solicitud.fecha_salida_programada,
       fecha_devolucion_programada: solicitud.fecha_devolucion_programada,
       metodo_transporte: solicitud.metodo_transporte,
       id_destino: solicitud.id_destino,
 
-      activo: {
-        nombre_maquina: solicitud.activo?.nombre_maquina || "Desconocido"
-      },
-      solicitante: {
-        nombre_completo: solicitud.solicitante?.nombre_completo || "Desconocido"
-      },
+      activo: { nombre_maquina: solicitud.activo?.nombre_maquina || "Desconocido" },
+      solicitante: { nombre_completo: solicitud.solicitante?.nombre_completo || "Desconocido" },
       
-      // TRADUCCIÓN DE FIRMAS: Convertimos la lista de Prisma al formato que espera React
+      // traducción de firmas al formato que espera el frontend
       firmas: {
-        gerente: solicitud.firmas.find(f => f.id_rol_esperado === 3)?.estatus_firma || 'Pendiente',
+        gerente: estatusGerenteFinal, // se inyecta el estatus consolidado
         syr: solicitud.firmas.find(f => f.id_rol_esperado === 4)?.estatus_firma || 'Pendiente',
         ehs: solicitud.firmas.find(f => f.id_rol_esperado === 5)?.estatus_firma || 'Pendiente'
       }

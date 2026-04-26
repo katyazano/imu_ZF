@@ -80,7 +80,8 @@ model usuarios {
   id_suplente               Int?
   secreto_2fa               String?                      @db.VarChar(100)
   activo                    Boolean?                     @default(true)
-  activos_gerente           activos[]                    @relation("GerenteActivo")
+  activos_a_cargo          activos_responsables[]
+  firmas_esperadas         aprobaciones_firma[]         @relation("UsuarioEsperadoFirma")
   firmas_realizadas         aprobaciones_firma[]         @relation("UsuarioFirma")
   movimientos_guardia       bitacora_caseta[]            @relation("GuardiaCaseta")
   mantenimientos_reportados mantenimientos_incidencias[] @relation("UsuarioReportador")
@@ -116,20 +117,19 @@ model activos {
   id_categoria           Int
   id_estado_maquina      Int
   id_ubicacion           Int
-  id_gerente_responsable Int
   id_proyecto            Int?
   id_tipo_compra         Int?
   id_tipo_nacionalidad   Int?
   categoria              categorias_activos           @relation(fields: [id_categoria], references: [id_categoria], onDelete: NoAction, onUpdate: NoAction)
   disciplina             disciplinas_areas            @relation(fields: [id_disciplina], references: [id_disciplina], onDelete: NoAction, onUpdate: NoAction)
   estado_maquina         estados_maquina              @relation(fields: [id_estado_maquina], references: [id_estado_maquina], onDelete: NoAction, onUpdate: NoAction)
-  gerente                usuarios                     @relation("GerenteActivo", fields: [id_gerente_responsable], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction)
   proyecto               centros_costo_proyectos?     @relation(fields: [id_proyecto], references: [id_proyecto], onDelete: NoAction, onUpdate: NoAction)
   tipo_compra            tipos_compra?                @relation(fields: [id_tipo_compra], references: [id_tipo_compra], onDelete: NoAction, onUpdate: NoAction)
   tipo_nacionalidad      tipos_nacionalidad?          @relation(fields: [id_tipo_nacionalidad], references: [id_tipo_nacionalidad], onDelete: NoAction, onUpdate: NoAction)
   ubicacion              ubicaciones_fisicas          @relation(fields: [id_ubicacion], references: [id_ubicacion], onDelete: NoAction, onUpdate: NoAction)
   mantenimientos         mantenimientos_incidencias[]
   solicitudes            solicitudes[]
+  responsables           activos_responsables[]
 }
 
 model solicitudes {
@@ -160,6 +160,8 @@ model aprobaciones_firma {
   estatus_firma    String      @db.VarChar(50)
   comentarios      String?
   fecha_firma      DateTime?   @db.Timestamp(6)
+  id_usuario_esperado Int?
+  usuario_esperado    usuarios? @relation("UsuarioEsperadoFirma", fields: [id_usuario_esperado], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction)
   rol_esperado     roles       @relation(fields: [id_rol_esperado], references: [id_rol], onDelete: NoAction, onUpdate: NoAction)
   solicitud        solicitudes @relation(fields: [id_solicitud], references: [id_solicitud], onDelete: NoAction, onUpdate: NoAction)
   usuario_firmo    usuarios?   @relation("UsuarioFirma", fields: [id_usuario_firmo], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction)
@@ -209,4 +211,16 @@ model mantenimientos_incidencias {
   activo                 activos      @relation(fields: [id_activo], references: [id_activo], onDelete: NoAction, onUpdate: NoAction)
   reportador             usuarios     @relation("UsuarioReportador", fields: [id_reportador], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction)
   solicitud              solicitudes? @relation(fields: [id_solicitud_origen], references: [id_solicitud], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model activos_responsables {
+  id_relacion Int @id @default(autoincrement())
+  id_activo   Int
+  id_usuario  Int
+
+  activo      activos  @relation(fields: [id_activo], references: [id_activo], onDelete: Cascade)
+  gerente     usuarios @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+
+  // Esta regla asegura que no le asignen el mismo activo dos veces al mismo gerente
+  @@unique([id_activo, id_usuario]) 
 }

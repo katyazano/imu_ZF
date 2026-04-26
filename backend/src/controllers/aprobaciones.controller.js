@@ -8,22 +8,33 @@ const getFirmasPendientes = async (req, res) => {
     const mi_id = req.usuario_token.id;
     const mi_rol = req.usuario_token.id_rol;
 
+    // refactor: ahora también necesitamos saber los IDs de a quién suplimos
     const usuariosAQuienesSuplo = await prisma.usuarios.findMany({
       where: { id_suplente: mi_id, activo: true },
-      select: { id_rol: true }
+      select: { id_usuario: true, id_rol: true }
     });
 
-    const roles_autorizados = [mi_rol]; 
-    usuariosAQuienesSuplo.forEach(u => roles_autorizados.push(u.id_rol));
+    const roles_autorizados = [mi_rol, ...usuariosAQuienesSuplo.map(u => u.id_rol)];
+    const ids_autorizados = [mi_id, ...usuariosAQuienesSuplo.map(u => u.id_usuario)];
 
     const firmas = await prisma.aprobaciones_firma.findMany({
       where: {
-        id_rol_esperado: { in: roles_autorizados }, 
         estatus_firma: 'Pendiente',
         solicitud: {
-          // No mostramos nada que ya esté cancelado, rechazado o en tránsito
           estatus_general: { notIn: ['Cancelada', 'Rechazada', 'En Tránsito'] } 
-        }
+        },
+        // refactor: filtro de seguridad
+        OR: [
+          // para Gerentes (Rol 3): Exigimos que sea exactamente para este usuario
+          { 
+            id_rol_esperado: 3, 
+            id_usuario_esperado: { in: ids_autorizados } 
+          },
+          // para otros roles (Logística, EHS): Se basa en el rol general
+          { 
+            id_rol_esperado: { in: roles_autorizados, not: 3 } 
+          }
+        ]
       },
       include: {
         solicitud: {
@@ -31,7 +42,6 @@ const getFirmasPendientes = async (req, res) => {
             activo: { select: { id_activo: true, nombre_maquina: true } },
             solicitante: { select: { nombre_completo: true } },
             destino: true,
-            // 👇 CLAVE: Traemos todas las firmas de la solicitud para revisarlas
             firmas: { select: { id_firma: true, estatus_firma: true } } 
           }
         }
@@ -92,17 +102,36 @@ const dictaminarFirma = async (req, res) => {
 
     if (!firmaExistente) return res.status(404).json({ error: "Firma no encontrada" });
 
-    let tengoPermiso = (firmaExistente.id_rol_esperado === mi_rol || mi_rol === 1);
+    // refactor: validación de permisos
+    let tengoPermiso = false;
 
-    if (!tengoPermiso) {
-      const supliendoA = await prisma.usuarios.findFirst({
-        where: { id_suplente: mi_id, id_rol: firmaExistente.id_rol_esperado, activo: true }
-      });
-      if (supliendoA) tengoPermiso = true;
+    if (mi_rol === 1) {
+      tengoPermiso = true; // El Admin tiene llave maestra
+    } else if (firmaExistente.id_rol_esperado === 3) {
+      // Si es firma de Gerente, obligamos a que el ID coincida
+      tengoPermiso = (firmaExistente.id_usuario_esperado === mi_id);
+      
+      if (!tengoPermiso) {
+        // revisamos si suple a ESE gerente específico
+        const supliendo = await prisma.usuarios.findFirst({
+          where: { id_usuario: firmaExistente.id_usuario_esperado, id_suplente: mi_id, activo: true }
+        });
+        if (supliendo) tengoPermiso = true;
+      }
+    } else {
+      // si es Logística o EHS, validamos por Rol General
+      tengoPermiso = (firmaExistente.id_rol_esperado === mi_rol);
+      
+      if (!tengoPermiso) {
+        const supliendo = await prisma.usuarios.findFirst({
+          where: { id_rol: firmaExistente.id_rol_esperado, id_suplente: mi_id, activo: true }
+        });
+        if (supliendo) tengoPermiso = true;
+      }
     }
 
     if (!tengoPermiso) {
-      return res.status(403).json({ error: "Tu rol no tiene permiso para aplicar esta firma." });
+      return res.status(403).json({ error: "Tu usuario no tiene permiso para aplicar esta firma específica." });
     }
 
     if (firmaExistente.solicitud.estatus_general === 'Cancelada' || firmaExistente.solicitud.estatus_general === 'Rechazada') {

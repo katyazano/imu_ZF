@@ -14,7 +14,10 @@ const getActivos = async (req, res) => {
     if (id_categoria) whereClause.id_categoria = parseInt(id_categoria);
     if (id_estado_maquina) whereClause.id_estado_maquina = parseInt(id_estado_maquina);
     if (mis_activos === 'true' && req.usuario_token) {
-      whereClause.id_gerente_responsable = req.usuario_token.id; 
+      // refactor: buscamos en la tabla activos_responsables si el usuario está en la lista de dueños
+      whereClause.responsables = {
+        some: { id_usuario: req.usuario_token.id }
+      };
     }
 
     if (q) {
@@ -84,7 +87,12 @@ const getActivoById = async (req, res) => {
         estado_maquina: true,
         disciplina: true,
         ubicacion: true,
-        gerente: { select: { nombre_completo: true } }
+        // refactor: en lugar de 'gerente', traemos la lista de responsables y su info
+        responsables: { 
+          include: {
+            gerente: { select: { nombre_completo: true } }
+          }
+        }
       }
     });
 
@@ -110,18 +118,37 @@ const crearActivo = async (req, res) => {
     const idResponsable = req.usuario_token ? req.usuario_token.id : 1; 
 
     // 🛡️ Escudo de fechas en la creación
-    if (datos.fecha_compra) {
+    if (!datos.fecha_compra || datos.fecha_compra.trim() === "") {
+      datos.fecha_compra = null; 
+    } else {
       datos.fecha_compra = new Date(datos.fecha_compra);
     }
+
+    // refactor: preparar arreglo de IDs de gerentes
+    let gerentesIds = [idResponsable]; 
+    
+    if (datos.gerentes_ids && Array.isArray(datos.gerentes_ids)) {
+        gerentesIds = datos.gerentes_ids.map(id => parseInt(id));
+    } 
+    // Si el front manda el campo viejo (Compatibilidad temporal)
+    else if (datos.id_gerente_responsable) {
+        gerentesIds = [parseInt(datos.id_gerente_responsable)];
+    }
+
+    // Limpiamos los datos viejos para que Prisma no crashee
+    delete datos.id_gerente_responsable;
+    delete datos.gerentes_ids;
 
     const nuevoActivo = await prisma.activos.create({
       data: {
         ...datos,
         qr_codigo: qrGenerado,
         id_estado_maquina: parseInt(datos.id_estado_maquina) || 1,
-        // Permite que el admin asigne a otro gerente, o usa el ID del creador por defecto
-        id_gerente_responsable: parseInt(datos.id_gerente_responsable) || idResponsable,
-        cantidad_actual: parseInt(datos.cantidad_inicial) || 1
+        cantidad_actual: parseInt(datos.cantidad_inicial) || 1,
+        // 🚨 REFACTOR: Creación anidada en la tabla intermedia 'activos_responsables'
+        responsables: {
+          create: gerentesIds.map(id => ({ id_usuario: id }))
+        }
       }
     });
 
@@ -148,10 +175,14 @@ const actualizarActivo = async (req, res) => {
     const datosNuevos = req.body;
 
     // 🛡️ Escudo de fechas en la actualización
-    if (datosNuevos.fecha_compra) {
+    if (datosNuevos.fecha_compra !== undefined) {
+      if (!datosNuevos.fecha_compra || datosNuevos.fecha_compra.trim() === "") {
+        datosNuevos.fecha_compra = null;
+      } else {
         datosNuevos.fecha_compra = new Date(datosNuevos.fecha_compra);
+      }
     }
-
+    delete datosNuevos.id_gerente_responsable; // evita crasheo de prisma
     const activoActualizado = await prisma.activos.update({
       where: { id_activo: parseInt(id) },
       data: datosNuevos 
