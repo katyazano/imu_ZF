@@ -14,26 +14,20 @@ const NuevoActivo = () => {
 
   const fileInputRef = useRef(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [archivoFisico, setArchivoFisico] = useState(null); 
 
-  // --- 1. CATÁLOGOS DINÁMICOS COMPLETOS ---
   const [catalogos, setCatalogos] = useState({
     categorias: [], disciplinas: [], ubicaciones: [],
     proyectos: [], tipos_compra: [], nacionalidades: []
   });
 
-  // --- 2. ESTADO EXACTO SEGÚN SCHEMA.PRISMA ---
   const [formData, setFormData] = useState({
     nombre_maquina: '', qr_codigo: '', numero_serie: '', tag: '',
     marca: '', modelo: '', numero_parte: '', anio: '', descripcion: '',
     id_categoria: '', id_disciplina: '', subarea: '', id_ubicacion: '',
-    cantidad_inicial: '', es_compra: false, fecha_compra: '', 
+    cantidad_inicial: '', es_compra: false, 
     factura: '', pedimento: '', valor_comercial: '',
-    id_proyecto: '', id_tipo_compra: '', id_tipo_nacionalidad: '', comentarios: '',
-    foto: null,
-    
-    // 🧠 EL CAMBIO INTELIGENTE:
-    // Toma el ID del localStorage. Si por alguna razón no está, usa el 1 (o tu ID de admin)
-    id_gerente_responsable: parseInt(localStorage.getItem('id')) || 1 
+    id_proyecto: '', id_tipo_compra: '', id_tipo_nacionalidad: '', comentarios: ''
   });
 
   useEffect(() => {
@@ -42,7 +36,6 @@ const NuevoActivo = () => {
         const token = localStorage.getItem('token');
         const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
         
-        // Disparamos todas las consultas a tu endpoint maestro
         const urls = ['categorias', 'disciplinas', 'ubicaciones', 'proyectos', 'tipos_compra', 'nacionalidades'];
         const responses = await Promise.all(
           urls.map(tipo => fetch(`${baseUrl}/catalogos/${tipo}`, { headers: { 'Authorization': `Bearer ${token}` } }))
@@ -69,7 +62,7 @@ const NuevoActivo = () => {
     const file = e.target.files[0];
     if (file) {
       setImagePreview(URL.createObjectURL(file));
-      setFormData({ ...formData, foto: file });
+      setArchivoFisico(file); 
     }
   };
 
@@ -81,21 +74,28 @@ const NuevoActivo = () => {
       const token = localStorage.getItem('token');
       const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
 
-      // Transformamos campos numéricos antes de enviar para evitar errores en Prisma
       const payload = {
         ...formData,
-        anio: formData.anio ? parseInt(formData.anio) : null,
+        anio: formData.anio ? parseInt(formData.anio, 10) : null,
         cantidad_inicial: formData.cantidad_inicial ? parseFloat(formData.cantidad_inicial) : null,
+        // Inyectamos cantidad_actual igual a la inicial automáticamente
+        cantidad_actual: formData.cantidad_inicial ? parseFloat(formData.cantidad_inicial) : null,
         valor_comercial: formData.valor_comercial ? parseFloat(formData.valor_comercial) : null,
-        id_categoria: parseInt(formData.id_categoria),
-        id_disciplina: parseInt(formData.id_disciplina),
-        id_ubicacion: parseInt(formData.id_ubicacion),
-        id_proyecto: formData.id_proyecto ? parseInt(formData.id_proyecto) : null,
-        id_tipo_compra: formData.id_tipo_compra ? parseInt(formData.id_tipo_compra) : null,
-        id_tipo_nacionalidad: formData.id_tipo_nacionalidad ? parseInt(formData.id_tipo_nacionalidad) : null,
-        id_estado_maquina: 1, 
-        // NOTA: id_gerente_responsable debe inyectarse en el backend usando el token
+        
+        id_categoria: parseInt(formData.id_categoria, 10),
+        id_disciplina: parseInt(formData.id_disciplina, 10),
+        id_ubicacion: parseInt(formData.id_ubicacion, 10),
+        
+        id_proyecto: formData.id_proyecto ? parseInt(formData.id_proyecto, 10) : null,
+        id_tipo_compra: formData.id_tipo_compra ? parseInt(formData.id_tipo_compra, 10) : null,
+        id_tipo_nacionalidad: formData.id_tipo_nacionalidad ? parseInt(formData.id_tipo_nacionalidad, 10) : null,
+        id_estado_maquina: 1 
       };
+
+      // Limpiamos strings vacíos para que Prisma no asigne nulos a campos de texto de forma incorrecta
+      Object.keys(payload).forEach(key => {
+        if (payload[key] === '') payload[key] = null;
+      });
 
       const response = await fetch(`${baseUrl}/activos`, {
         method: 'POST',
@@ -107,10 +107,13 @@ const NuevoActivo = () => {
       });
 
       if (response.ok) setShowSuccess(true);
-      else alert("Error al guardar. Revisa que el QR o Serie no estén duplicados.");
+      else {
+        const errorData = await response.json();
+        alert(`Error al guardar: ${errorData.error || 'Revisa duplicados'}`);
+      }
     } catch (e) {
       console.error(e);
-      alert("Error de conexión.");
+      alert("Error de conexión con el servidor.");
     } finally {
       setLoading(false);
     }

@@ -120,6 +120,7 @@ model activos {
   id_proyecto            Int?
   id_tipo_compra         Int?
   id_tipo_nacionalidad   Int?
+  foto_url               String?  @db.Text
   categoria              categorias_activos           @relation(fields: [id_categoria], references: [id_categoria], onDelete: NoAction, onUpdate: NoAction)
   disciplina             disciplinas_areas            @relation(fields: [id_disciplina], references: [id_disciplina], onDelete: NoAction, onUpdate: NoAction)
   estado_maquina         estados_maquina              @relation(fields: [id_estado_maquina], references: [id_estado_maquina], onDelete: NoAction, onUpdate: NoAction)
