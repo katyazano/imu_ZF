@@ -71,65 +71,66 @@ model centros_costo_proyectos {
 }
 
 model usuarios {
-  id_usuario                Int                          @id @default(autoincrement())
-  nombre_completo           String                       @db.VarChar(150)
-  email                     String                       @unique @db.VarChar(100)
-  password_hash             String                       @db.VarChar(255)
-  id_rol                    Int
-  id_disciplina             Int
-  id_suplente               Int?
-  secreto_2fa               String?                      @db.VarChar(100)
-  activo                    Boolean?                     @default(true)
-  activos_gerente           activos[]                    @relation("GerenteActivo")
-  firmas_realizadas         aprobaciones_firma[]         @relation("UsuarioFirma")
-  movimientos_guardia       bitacora_caseta[]            @relation("GuardiaCaseta")
-  mantenimientos_reportados mantenimientos_incidencias[] @relation("UsuarioReportador")
-  alertas_recibidas         registro_alertas_retrasos[]  @relation("UsuarioInfractor")
-  solicitudes_solicitante   solicitudes[]                @relation("UsuarioSolicitante")
-  disciplina                disciplinas_areas            @relation(fields: [id_disciplina], references: [id_disciplina], onDelete: NoAction, onUpdate: NoAction)
-  rol                       roles                        @relation(fields: [id_rol], references: [id_rol], onDelete: NoAction, onUpdate: NoAction)
-  usuario_suplente          usuarios?                    @relation("Suplencias", fields: [id_suplente], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction)
-  suplentes                 usuarios[]                   @relation("Suplencias")
+  id_usuario                                                          Int                          @id @default(autoincrement())
+  nombre_completo                                                     String                       @db.VarChar(150)
+  email                                                               String                       @unique @db.VarChar(100)
+  password_hash                                                       String                       @db.VarChar(255)
+  id_rol                                                              Int
+  id_disciplina                                                       Int
+  id_suplente                                                         Int?
+  secreto_2fa                                                         String?                      @db.VarChar(100)
+  activo                                                              Boolean?                     @default(true)
+  activos_responsables                                                activos_responsables[]
+  aprobaciones_firma_aprobaciones_firma_id_usuario_esperadoTousuarios aprobaciones_firma[]         @relation("aprobaciones_firma_id_usuario_esperadoTousuarios")
+  firmas_realizadas                                                   aprobaciones_firma[]         @relation("UsuarioFirma")
+  movimientos_guardia                                                 bitacora_caseta[]            @relation("GuardiaCaseta")
+  mantenimientos_reportados                                           mantenimientos_incidencias[] @relation("UsuarioReportador")
+  alertas_recibidas                                                   registro_alertas_retrasos[]  @relation("UsuarioInfractor")
+  solicitudes_solicitante                                             solicitudes[]                @relation("UsuarioSolicitante")
+  disciplina                                                          disciplinas_areas            @relation(fields: [id_disciplina], references: [id_disciplina], onDelete: NoAction, onUpdate: NoAction)
+  rol                                                                 roles                        @relation(fields: [id_rol], references: [id_rol], onDelete: NoAction, onUpdate: NoAction)
+  usuario_suplente                                                    usuarios?                    @relation("Suplencias", fields: [id_suplente], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction)
+  suplentes                                                           usuarios[]                   @relation("Suplencias")
 }
 
 model activos {
-  id_activo              Int                          @id @default(autoincrement())
-  qr_codigo              String                       @unique @db.VarChar(255)
-  numero_serie           String                       @unique @db.VarChar(100)
-  numero_parte           String?                      @db.VarChar(100)
-  marca                  String                       @db.VarChar(100)
-  modelo                 String                       @db.VarChar(100)
-  anio                   Int?
-  nombre_maquina         String                       @db.VarChar(150)
-  tag                    String?                      @db.VarChar(100)
-  subarea                String?                      @db.VarChar(100)
-  descripcion            String?
-  comentarios            String?
-  cantidad_inicial       Decimal?                     @db.Decimal(10, 2)
-  cantidad_actual        Decimal?                     @db.Decimal(10, 2)
-  pedimento              String?                      @db.VarChar(100)
-  factura                String?                      @db.VarChar(100)
-  valor_comercial        Decimal?                     @db.Decimal(15, 2)
-  fecha_compra           DateTime?                    @db.Date
-  es_compra              Boolean?
-  id_disciplina          Int
-  id_categoria           Int
-  id_estado_maquina      Int
-  id_ubicacion           Int
-  id_gerente_responsable Int
-  id_proyecto            Int?
-  id_tipo_compra         Int?
-  id_tipo_nacionalidad   Int?
-  categoria              categorias_activos           @relation(fields: [id_categoria], references: [id_categoria], onDelete: NoAction, onUpdate: NoAction)
-  disciplina             disciplinas_areas            @relation(fields: [id_disciplina], references: [id_disciplina], onDelete: NoAction, onUpdate: NoAction)
-  estado_maquina         estados_maquina              @relation(fields: [id_estado_maquina], references: [id_estado_maquina], onDelete: NoAction, onUpdate: NoAction)
-  gerente                usuarios                     @relation("GerenteActivo", fields: [id_gerente_responsable], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction)
-  proyecto               centros_costo_proyectos?     @relation(fields: [id_proyecto], references: [id_proyecto], onDelete: NoAction, onUpdate: NoAction)
-  tipo_compra            tipos_compra?                @relation(fields: [id_tipo_compra], references: [id_tipo_compra], onDelete: NoAction, onUpdate: NoAction)
-  tipo_nacionalidad      tipos_nacionalidad?          @relation(fields: [id_tipo_nacionalidad], references: [id_tipo_nacionalidad], onDelete: NoAction, onUpdate: NoAction)
-  ubicacion              ubicaciones_fisicas          @relation(fields: [id_ubicacion], references: [id_ubicacion], onDelete: NoAction, onUpdate: NoAction)
-  mantenimientos         mantenimientos_incidencias[]
-  solicitudes            solicitudes[]
+  id_activo            Int                          @id @default(autoincrement())
+  qr_codigo            String                       @unique @db.VarChar(255)
+  numero_serie         String                       @unique @db.VarChar(100)
+  numero_parte         String?                      @db.VarChar(100)
+  marca                String                       @db.VarChar(100)
+  modelo               String                       @db.VarChar(100)
+  anio                 Int?
+  nombre_maquina       String                       @db.VarChar(150)
+  tag                  String?                      @db.VarChar(100)
+  subarea              String?                      @db.VarChar(100)
+  descripcion          String?
+  comentarios          String?
+  cantidad_inicial     Decimal?                     @db.Decimal(10, 2)
+  cantidad_actual      Decimal?                     @db.Decimal(10, 2)
+  pedimento            String?                      @db.VarChar(100)
+  factura              String?                      @db.VarChar(100)
+  valor_comercial      Decimal?                     @db.Decimal(15, 2)
+  fecha_compra         DateTime?                    @db.Date
+  es_compra            Boolean?
+  id_disciplina        Int
+  id_categoria         Int
+  id_estado_maquina    Int
+  id_ubicacion         Int
+  id_proyecto          Int?
+  id_tipo_compra       Int?
+  id_tipo_nacionalidad Int?
+  foto_url             String?
+  categoria            categorias_activos           @relation(fields: [id_categoria], references: [id_categoria], onDelete: NoAction, onUpdate: NoAction)
+  disciplina           disciplinas_areas            @relation(fields: [id_disciplina], references: [id_disciplina], onDelete: NoAction, onUpdate: NoAction)
+  estado_maquina       estados_maquina              @relation(fields: [id_estado_maquina], references: [id_estado_maquina], onDelete: NoAction, onUpdate: NoAction)
+  proyecto             centros_costo_proyectos?     @relation(fields: [id_proyecto], references: [id_proyecto], onDelete: NoAction, onUpdate: NoAction)
+  tipo_compra          tipos_compra?                @relation(fields: [id_tipo_compra], references: [id_tipo_compra], onDelete: NoAction, onUpdate: NoAction)
+  tipo_nacionalidad    tipos_nacionalidad?          @relation(fields: [id_tipo_nacionalidad], references: [id_tipo_nacionalidad], onDelete: NoAction, onUpdate: NoAction)
+  ubicacion            ubicaciones_fisicas          @relation(fields: [id_ubicacion], references: [id_ubicacion], onDelete: NoAction, onUpdate: NoAction)
+  activos_responsables activos_responsables[]
+  mantenimientos       mantenimientos_incidencias[]
+  solicitudes          solicitudes[]
 }
 
 model solicitudes {
@@ -153,16 +154,18 @@ model solicitudes {
 }
 
 model aprobaciones_firma {
-  id_firma         Int         @id @default(autoincrement())
-  id_solicitud     Int
-  id_rol_esperado  Int
-  id_usuario_firmo Int?
-  estatus_firma    String      @db.VarChar(50)
-  comentarios      String?
-  fecha_firma      DateTime?   @db.Timestamp(6)
-  rol_esperado     roles       @relation(fields: [id_rol_esperado], references: [id_rol], onDelete: NoAction, onUpdate: NoAction)
-  solicitud        solicitudes @relation(fields: [id_solicitud], references: [id_solicitud], onDelete: NoAction, onUpdate: NoAction)
-  usuario_firmo    usuarios?   @relation("UsuarioFirma", fields: [id_usuario_firmo], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction)
+  id_firma                                                  Int         @id @default(autoincrement())
+  id_solicitud                                              Int
+  id_rol_esperado                                           Int
+  id_usuario_firmo                                          Int?
+  estatus_firma                                             String      @db.VarChar(50)
+  comentarios                                               String?
+  fecha_firma                                               DateTime?   @db.Timestamp(6)
+  id_usuario_esperado                                       Int?
+  rol_esperado                                              roles       @relation(fields: [id_rol_esperado], references: [id_rol], onDelete: NoAction, onUpdate: NoAction)
+  solicitud                                                 solicitudes @relation(fields: [id_solicitud], references: [id_solicitud], onDelete: NoAction, onUpdate: NoAction)
+  usuarios_aprobaciones_firma_id_usuario_esperadoTousuarios usuarios?   @relation("aprobaciones_firma_id_usuario_esperadoTousuarios", fields: [id_usuario_esperado], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction)
+  usuario_firmo                                             usuarios?   @relation("UsuarioFirma", fields: [id_usuario_firmo], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction)
 }
 
 model reglas_aprobacion {
@@ -209,4 +212,14 @@ model mantenimientos_incidencias {
   activo                 activos      @relation(fields: [id_activo], references: [id_activo], onDelete: NoAction, onUpdate: NoAction)
   reportador             usuarios     @relation("UsuarioReportador", fields: [id_reportador], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction)
   solicitud              solicitudes? @relation(fields: [id_solicitud_origen], references: [id_solicitud], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model activos_responsables {
+  id_relacion Int      @id @default(autoincrement())
+  id_activo   Int
+  id_usuario  Int
+  activos     activos  @relation(fields: [id_activo], references: [id_activo], onDelete: Cascade)
+  usuarios    usuarios @relation(fields: [id_usuario], references: [id_usuario], onDelete: Cascade)
+
+  @@unique([id_activo, id_usuario])
 }
